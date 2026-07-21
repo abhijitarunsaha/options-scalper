@@ -1,0 +1,201 @@
+"""
+trend_predictor.py — Near-term (15-30 min) directional read + target projection.
+
+This is NOT a trained ML model — there's no historical-accuracy-tested model
+here, and framing it as one would overstate what it does. It's a structured,
+transparent codification of the same reasoning a discretionary trader uses:
+
+  1. Support/resistance ladder — once price breaks a level, the next level
+     in that direction becomes the projected "likely touch" target. This is
+     exactly the "crossed 24190 -> 24170 support" read described.
+  2. Bollinger Band position — riding the band = continuation bias; pinned
+     at a band edge with no expansion = mean-reversion bias back to VWAP/mid.
+  3. RSI divergence — price vs RSI making disagreeing highs/lows over the
+     recent swing, the classic early-reversal tell.
+  4. 5-min parallel confluence — the 1-min read is checked against the same
+     read computed on 5-min-resampled candles. Disagreement between the two
+     is surfaced explicitly and lowers confidence — this is the most likely
+     reason a target like the 24185->24200 case didn't play out: a 1-min-only
+     read missed that the 5-min timeframe wasn't supporting the move.
+
+Output is a bias + confidence + target/invalidation levels + the rationale
+list behind each, not a single trade call — confidence is a transparency
+score for how many of these factors agree, not a backtested win-rate.
+"""
+import pandas as pd
+import numpy as np
+from ta.momentum import RSIIndicator
+from ta.trend import EMAIndicator
+
+LOOKBACK_DIVERGENCE = 40   # bars scanned for RSI divergence pivots
+LADDER_LOOKBACK     = 60   # bars scanned for S/R candidate levels
+LADDER_ATR_RANGE    = 2.5  # only keep levels within this many ATRs of LTP
+MERGE_ATR_FRAC      = 0.15 # merge S/R levels closer than this fraction of ATR
+
+
+def _pivots(series: pd.Series, kind: str):
+    """Simple 3-bar pivot highs/lows -> list of (index, value)."""
+    vals = series.values
+    out = []
+    for i in range(1, len(vals) - 1):
+        if kind == "high" and vals[i] > vals[i - 1] and vals[i] > vals[i + 1]:
+            out.append((i, vals[i]))
+        if kind == "low" and vals[i] < vals[i - 1] and vals[i] < vals[i + 1]:
+            out.append((i, vals[i]))
+    return out
+
+
+def _sr_ladder(df: pd.DataFrame, ltp: float, atr: float) -> dict:
+    win = df.tail(LADDER_LOOKBACK)
+    highs = [v for _, v in _pivots(win["high"], "high")]
+    lows  = [v for _, v in _pivots(win["low"], "low")]
+    levels = sorted(set(round(x, 1) for x in highs + lows))
+
+    # merge levels that are within MERGE_ATR_FRAC*ATR of each other
+    merged = []
+    for lv in levels:
+        if merged and abs(lv - merged[-1]) <= MERGE_ATR_FRAC * (atr or 1):
+            merged[-1] = round((merged[-1] + lv) / 2, 1)
+        else:
+            merged.append(lv)
+
+    band = LADDER_ATR_RANGE * (atr or 1)
+    above = sorted(v for v in merged if ltp < v <= ltp + band)
+    below = sorted((v for v in merged if ltp - band <= v < ltp), reverse=True)
+    return {"above": above, "below": below}
+
+
+def _rsi_divergence(df: pd.DataFrame) -> dict:
+    win = df.tail(LOOKBACK_DIVERGENCE)
+    if len(win) < 10 or "rsi" not in win or win["rsi"].isna().all():
+        return {"bullish": False, "bearish": False, "detail": None}
+
+    lows  = _pivots(win["low"], "low")
+    highs = _pivots(win["high"], "high")
+    rsi = win["rsi"].reset_index(drop=True)
+
+    bullish = bearish = False
+    detail = None
+    if len(lows) >= 2:
+        (i1, p1), (i2, p2) = lows[-2], lows[-1]
+        r1, r2 = rsi.iloc[i1], rsi.iloc[i2]
+        if pd.notna(r1) and pd.notna(r2) and p2 < p1 and r2 > r1:
+            bullish = True
+            detail = f"Bullish RSI divergence: price lower low ({p1:.0f}->{p2:.0f}) but RSI higher low ({r1:.0f}->{r2:.0f})"
+    if len(highs) >= 2:
+        (i1, p1), (i2, p2) = highs[-2], highs[-1]
+        r1, r2 = rsi.iloc[i1], rsi.iloc[i2]
+        if pd.notna(r1) and pd.notna(r2) and p2 > p1 and r2 < r1:
+            bearish = True
+            detail = f"Bearish RSI divergence: price higher high ({p1:.0f}->{p2:.0f}) but RSI lower high ({r1:.0f}->{r2:.0f})"
+    return {"bullish": bullish, "bearish": bearish, "detail": detail}
+
+
+def _resample_5m(candles: list) -> pd.DataFrame:
+    df = pd.DataFrame(candles)
+    df["time"] = pd.to_datetime(df["time"])
+    df = df.set_index("time").sort_index()
+    agg = df.resample("5min").agg({"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}).dropna()
+    return agg.reset_index()
+
+
+def _mtf_bias(df5: pd.DataFrame) -> dict:
+    if len(df5) < 6:
+        return {"bias": "NEUTRAL", "detail": "Not enough 5-min bars yet"}
+    close = df5["close"]
+    e9  = EMAIndicator(close=close, window=min(9, len(df5))).ema_indicator().iloc[-1]
+    e21 = EMAIndicator(close=close, window=min(21, len(df5))).ema_indicator().iloc[-1]
+    ltp = close.iloc[-1]
+    if ltp > e9 > e21:
+        return {"bias": "UP", "detail": f"5-min: price>EMA9>EMA21 ({ltp:.0f}>{e9:.0f}>{e21:.0f})"}
+    if ltp < e9 < e21:
+        return {"bias": "DOWN", "detail": f"5-min: price<EMA9<EMA21 ({ltp:.0f}<{e9:.0f}<{e21:.0f})"}
+    return {"bias": "NEUTRAL", "detail": "5-min EMAs not aligned"}
+
+
+def predict(candles: list, data: dict) -> dict:
+    """
+    candles: raw 1-min OHLCV list (same as passed to evaluate_signals)
+    data:    the dict returned by indicators.compute_all() for the same candles
+    """
+    if len(candles) < 20 or not data:
+        return {"bias": "NEUTRAL", "confidence": 0, "rationale": ["Warming up"]}
+
+    df = pd.DataFrame(data["candles"])
+    L  = data["latest"]
+    ltp, atr = L["ltp"], L.get("atr") or 1
+    trn = data["trend"]
+
+    rationale = []
+    score = 0  # -100..+100, +ve = bullish bias
+
+    # 1) Trend / EMA structure (1-min)
+    if trn["trend"] == "BULLISH_TREND":
+        score += 25; rationale.append("1-min trend: bullish EMA stack")
+    elif trn["trend"] == "BEARISH_TREND":
+        score -= 25; rationale.append("1-min trend: bearish EMA stack")
+    elif trn["trend"] == "WEAK_BULLISH":
+        score += 10; rationale.append("1-min trend: weak bullish lean")
+    elif trn["trend"] == "WEAK_BEARISH":
+        score -= 10; rationale.append("1-min trend: weak bearish lean")
+
+    # 2) Bollinger Band position
+    bb_pct = L.get("bb_pct")
+    if bb_pct is not None:
+        if bb_pct >= 0.85:
+            if trn["trend"] in ("BULLISH_TREND", "WEAK_BULLISH"):
+                score += 8; rationale.append(f"Riding upper BB ({bb_pct:.2f}) with trend — continuation lean")
+            else:
+                score -= 12; rationale.append(f"Pinned at upper BB ({bb_pct:.2f}) without trend — mean-reversion risk")
+        elif bb_pct <= 0.15:
+            if trn["trend"] in ("BEARISH_TREND", "WEAK_BEARISH"):
+                score -= 8; rationale.append(f"Riding lower BB ({bb_pct:.2f}) with trend — continuation lean")
+            else:
+                score += 12; rationale.append(f"Pinned at lower BB ({bb_pct:.2f}) without trend — bounce risk")
+
+    # 3) RSI divergence (overrides / reinforces)
+    div = _rsi_divergence(df)
+    if div["bullish"]:
+        score += 20; rationale.append(div["detail"])
+    if div["bearish"]:
+        score -= 20; rationale.append(div["detail"])
+
+    # 4) 5-min parallel confluence
+    df5 = _resample_5m(candles)
+    mtf = _mtf_bias(df5)
+    one_min_dir = "UP" if score > 0 else "DOWN" if score < 0 else "NEUTRAL"
+    aligned = mtf["bias"] == one_min_dir or mtf["bias"] == "NEUTRAL"
+    if mtf["bias"] != "NEUTRAL" and mtf["bias"] == one_min_dir:
+        score += 15 if score > 0 else -15
+        rationale.append(f"5-min confirms: {mtf['detail']}")
+    elif mtf["bias"] != "NEUTRAL" and mtf["bias"] != one_min_dir:
+        score = int(score * 0.4)  # sharply discount — this is the disagreement case
+        rationale.append(f"5-min CONFLICTS with 1-min read: {mtf['detail']} — confidence cut")
+    else:
+        rationale.append(mtf["detail"])
+
+    bias = "UP" if score >= 12 else "DOWN" if score <= -12 else "NEUTRAL"
+    confidence = min(100, abs(score))
+
+    # 5) Target / invalidation from the S/R ladder in the bias direction
+    ladder = _sr_ladder(df, ltp, atr)
+    target = invalidation = None
+    if bias == "UP":
+        target       = ladder["above"][0] if ladder["above"] else None
+        invalidation = ladder["below"][0] if ladder["below"] else None
+    elif bias == "DOWN":
+        target       = ladder["below"][0] if ladder["below"] else None
+        invalidation = ladder["above"][0] if ladder["above"] else None
+
+    return {
+        "bias": bias,
+        "confidence": confidence,
+        "horizon_minutes": "15-30",
+        "target": target,
+        "invalidation": invalidation,
+        "mtf_aligned": aligned,
+        "mtf_detail": mtf["detail"],
+        "rsi_divergence": div,
+        "sr_ladder": ladder,
+        "rationale": rationale,
+    }
