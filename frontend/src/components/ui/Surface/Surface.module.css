@@ -1,0 +1,120 @@
+.surface{
+
+    position:relative;
+
+    display:flex;
+    flex-direction:column;
+
+    border-radius:var(--radius-lg);
+
+    background:var(--glass2);
+
+    border:1px solid var(--border);
+
+    backdrop-filter:blur(14px);
+
+    box-shadow:var(--shadow);
+
+    transition:
+
+        transform var(--transition-fast),
+
+        background var(--transition-fast),
+
+        border-color var(--transition-fast),
+
+        box-shadow var(--transition-fast);
+
+}
+
+/* ---------------------------------- */
+/* Padding                            */
+/* ---------------------------------- */
+
+.pad-none{
+
+    padding:0;
+
+}
+
+.pad-sm{
+
+    padding:var(--space-sm);
+
+}
+
+.pad-md{
+
+    padding:var(--space-md);
+
+}
+
+.pad-lg{
+
+    padding:var(--space-lg);
+
+}
+
+/* ---------------------------------- */
+/* Variants                           */
+/* ---------------------------------- */
+
+.default{
+
+}
+
+.glass{
+
+    background:var(--glass);
+
+}
+
+.elevated{
+
+    background:var(--bg2);
+
+}
+
+.success{
+
+    border-color:rgba(47,190,131,.25);
+
+}
+
+.danger{
+
+    border-color:rgba(225,73,95,.25);
+
+}
+
+.warning{
+
+    border-color:rgba(233,169,59,.25);
+
+}
+
+/* ---------------------------------- */
+
+.hover:hover{
+
+    transform:translateY(-2px);
+
+    border-color:var(--brand);
+
+}
+
+/* ---------------------------------- */
+
+.clickable{
+
+    cursor:pointer;
+
+}
+
+/* ---------------------------------- */
+
+.clickable:active{
+
+    transform:scale(.995);
+
+}

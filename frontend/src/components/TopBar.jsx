@@ -17,7 +17,7 @@ const INDICES = ["NIFTY", "BANKNIFTY", "SENSEX"];
 
 export default function TopBar({ connected, authError, ltp, index, onIndex, onReload, candles, minCandles, signal, totalPnl, activeTab, onTab }) {
   const clock = useClock();
-  const { dark, toggle } = useTheme();
+  const {themeName, isDark, toggleTheme} = useTheme();
   const tier = signal?.tier;
   const sig = signal?.signal;
   const isCE = sig === "CE_BUY", isPE = sig === "PE_BUY";
@@ -131,11 +131,11 @@ export default function TopBar({ connected, authError, ltp, index, onIndex, onRe
           </div>
         )}
 
-        <button onClick={toggle} aria-label="Toggle theme" style={{
+        <button onClick={toggleTheme} aria-label="Toggle theme" style={{
           width: 32, height: 32, borderRadius: 9, border: "1px solid var(--border)",
           background: "var(--bg4)", color: "var(--text2)", fontSize: 13, fontWeight: 600,
           display: "flex", alignItems: "center", justifyContent: "center",
-        }}>{dark ? "☾" : "☀"}</button>
+        }}>{isDark ? "☾" : "☀"}</button>
 
         <button onClick={onReload} aria-label="Reload" style={{
           width: 32, height: 32, borderRadius: 9, border: "1px solid var(--border)",

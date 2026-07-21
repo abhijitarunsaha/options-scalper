@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { T, pnlColor } from "../theme";
+import TerminalPanel from "./ui/TerminalPanel";
 
 function PBar({ pct, sl, entry, target }) {
   const p = Math.max(-10, Math.min(105, pct || 0));
@@ -24,9 +25,9 @@ function PBar({ pct, sl, entry, target }) {
 
 function ModifyForm({ trade, onDone }) {
   const [price, setPrice] = useState(String(trade.limit_price || ""));
-  const [qty,   setQty]   = useState(String(trade.qty || ""));
-  const [busy,  setBusy]  = useState(false);
-  const [err,   setErr]   = useState(null);
+  const [qty, setQty] = useState(String(trade.qty || ""));
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
   const lotSz = Math.round(trade.qty / trade.lots);
 
   const submit = async () => {
@@ -72,11 +73,11 @@ function TradeCard({ trade, onRefresh }) {
   const pc = pnlColor(pnl);
   const isCE = trade.type === "CE";
   const statusStyle = {
-    PENDING:   { c: "var(--gold)",  bg: "var(--goldDim)",  label: "⏳ PENDING"   },
-    OPEN:      { c: "var(--green)", bg: "var(--greenDim)", label: "● OPEN"       },
-    COMPLETED: { c: "var(--text2)", bg: "var(--bg4)",      label: "✓ DONE"       },
-    CANCELLED: { c: "var(--muted)", bg: "var(--bg4)",      label: "✕ CANCELLED"  },
-    REJECTED:  { c: "var(--red)",   bg: "var(--redDim)",   label: "✗ REJECTED"   },
+    PENDING: { c: "var(--gold)", bg: "var(--goldDim)", label: "⏳ PENDING" },
+    OPEN: { c: "var(--green)", bg: "var(--greenDim)", label: "● OPEN" },
+    COMPLETED: { c: "var(--text2)", bg: "var(--bg4)", label: "✓ DONE" },
+    CANCELLED: { c: "var(--muted)", bg: "var(--bg4)", label: "✕ CANCELLED" },
+    REJECTED: { c: "var(--red)", bg: "var(--redDim)", label: "✗ REJECTED" },
   }[trade.status] || {};
   const exitBadge = { SL_TRIGGERED: ["🔴 SL Hit", "var(--red)"], CLOSED_EXTERNALLY: ["⚡ Auto-Closed", "var(--gold)"], MANUAL_EXIT: ["✓ Manual", "var(--text2)"] }[trade.exit_reason];
 
@@ -168,11 +169,21 @@ export default function TradeBox({ onUpdate }) {
   const [totalPnl, setTotal] = useState(null);
   const [showHist, setShowHist] = useState(false);
 
+  const actionButton = {
+    fontSize: 11,
+    padding: "4px 10px",
+    borderRadius: 8,
+    border: "1px solid var(--border)",
+    background: "var(--bg4)",
+    color: "var(--text2)",
+    cursor: "pointer"
+  };
+
   const refresh = useCallback(async () => {
     try {
       const r = await axios.get("/trade/refresh");
       setTrades(r.data.trades || []); setSummary(r.data); setTotal(r.data.total_pnl ?? null); onUpdate?.();
-    } catch {}
+    } catch { }
   }, [onUpdate]);
 
   useEffect(() => { refresh(); const id = setInterval(refresh, 5000); return () => clearInterval(id); }, [refresh]);
@@ -184,24 +195,60 @@ export default function TradeBox({ onUpdate }) {
   const tc = pnlColor(totalPnl);
 
   return (
-    <div style={{ background: "var(--glass2)", border: "1px solid var(--border)", borderRadius: "var(--radius2)", overflow: "hidden", backdropFilter: "blur(12px)" }}>
-      <div style={{ padding: "12px 16px", background: "var(--bg3)", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ fontWeight: 700, color: "var(--text)", fontSize: 14 }}>Open Positions</span>
-          {summary.pending > 0 && <Tag l={`${summary.pending} Pending`} c="var(--gold)" />}
-          {summary.open > 0 && <Tag l={`${summary.open} Open`} c="var(--green)" />}
-          {summary.completed > 0 && <Tag l={`${summary.completed} Done`} c="var(--muted)" />}
-          {totalPnl != null && (
-            <div style={{ fontFamily: T.mono, fontSize: 13, fontWeight: 700, padding: "3px 12px", borderRadius: 20, color: tc, background: `${tc}18`, border: `1px solid ${tc}33` }}>
-              {totalPnl >= 0 ? "+" : ""}₹{Math.abs(totalPnl).toFixed(2)}
-            </div>
-          )}
+    <TerminalPanel
+      icon="💼"
+      title="Open Positions"
+      subtitle={`${summary.open || 0} active · ${summary.pending || 0} pending`}
+      actions={
+        <div
+          style={{
+            display: "flex",
+            gap: 6
+          }}
+        >
+          <button
+            onClick={refresh}
+            style={actionButton}
+          >
+            ↻
+          </button>
+
+          {hist.length > 0 &&
+            <button
+              onClick={() => setShowHist(h => !h)}
+              style={actionButton}
+            >
+              {showHist ? "▲" : "▼"} History
+            </button>
+          }
+
         </div>
-        <div style={{ display: "flex", gap: 6 }}>
-          <button onClick={refresh} style={{ fontSize: 11, color: "var(--text2)", background: "var(--bg4)", border: "1px solid var(--border)", borderRadius: 7, padding: "3px 10px" }}>↺</button>
-          {hist.length > 0 && <button onClick={() => setShowHist(h => !h)} style={{ fontSize: 11, color: "var(--text2)", background: "var(--bg4)", border: "1px solid var(--border)", borderRadius: 7, padding: "3px 10px" }}>{showHist ? "▲" : "▼"} History</button>}
+      }
+    >
+      {totalPnl != null &&
+
+        <div
+          style={{
+            marginBottom: 16,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "6px 12px",
+            borderRadius: 999,
+            background: `${tc}18`,
+            border: `1px solid ${tc}33`,
+            color: tc,
+            fontWeight: 700,
+            fontFamily: T.mono
+          }}
+        >
+          Total P&L
+
+          {totalPnl >= 0 ? "+" : ""}
+          ₹{Math.abs(totalPnl).toFixed(2)}
         </div>
-      </div>
+
+      }
       <div style={{ padding: "12px 16px" }}>
         {active.map(t => <TradeCard key={t.trade_id} trade={t} onRefresh={refresh} />)}
         {!active.length && <div style={{ fontSize: 12, color: "var(--muted)", padding: "12px 0", textAlign: "center" }}>No active positions</div>}
@@ -210,7 +257,7 @@ export default function TradeBox({ onUpdate }) {
           {hist.map(t => <TradeCard key={t.trade_id} trade={t} onRefresh={refresh} />)}
         </>}
       </div>
-    </div>
+    </TerminalPanel>
   );
 }
 function Tag({ l, c }) {

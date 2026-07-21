@@ -1,0 +1,105 @@
+/* ==========================================================
+   Trading Terminal Design Tokens
+   ========================================================== */
+
+:root {
+
+  /* Typography */
+  --font-display: "Space Grotesk", sans-serif;
+  --font-ui: "Inter", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+
+  /* Motion */
+  --transition-fast: 160ms ease;
+  --transition-normal: 220ms ease;
+  --transition-slow: 320ms ease;
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 20px;
+  --space-xl: 28px;
+}
+
+/* ==========================================================
+   Warm Ink
+   ========================================================== */
+
+html[data-theme="warmInk"] {
+
+  --bg: #111315;
+  --bg2: #171a1d;
+  --bg3: #1d2125;
+  --bg4: #252b30;
+
+  --panel: rgba(29,33,37,.92);
+
+  --glass: rgba(255,255,255,.04);
+  --glass2: rgba(255,255,255,.06);
+
+  --border: rgba(255,255,255,.08);
+
+  --text: #F4F3EF;
+  --text2: #B5BBC4;
+  --muted: #7C8793;
+
+  --brand: #3B82F6;
+  --brandDim: rgba(59,130,246,.12);
+
+  --bull: #2FBE83;
+  --bullGlow: rgba(47,190,131,.40);
+
+  --bear: #E1495F;
+  --bearGlow: rgba(225,73,95,.35);
+
+  --watch: #E9A93B;
+  --watchDim: rgba(233,169,59,.12);
+
+  --shadow:
+      0 8px 32px rgba(0,0,0,.28);
+}
+
+/* ==========================================================
+   Light
+   ========================================================== */
+
+html[data-theme="light"] {
+
+  --bg: #F5F6F8;
+  --bg2: #FFFFFF;
+  --bg3: #F2F4F7;
+  --bg4: #E7EBF0;
+
+  --panel: rgba(255,255,255,.95);
+
+  --glass: rgba(255,255,255,.80);
+  --glass2: rgba(255,255,255,.88);
+
+  --border: rgba(15,23,42,.08);
+
+  --text: #17202A;
+  --text2: #586170;
+  --muted: #8892A0;
+
+  --brand: #2563EB;
+  --brandDim: rgba(37,99,235,.12);
+
+  --bull: #1F9D66;
+  --bullGlow: rgba(31,157,102,.25);
+
+  --bear: #D9485A;
+  --bearGlow: rgba(217,72,90,.22);
+
+  --watch: #C68A19;
+  --watchDim: rgba(198,138,25,.12);
+
+  --shadow:
+      0 10px 26px rgba(15,23,42,.08);
+}
