@@ -1,22 +1,104 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, {
+    createContext,
+    useContext,
+    useEffect,
+    useMemo,
+    useState
+} from "react";
 
-export const ThemeContext = createContext({ dark: true, toggle: () => {} });
+import {
+    light,
+    warmInk,
+    spacing,
+    radius,
+    typography,
+    shadows,
+    motion
+} from "./design-system";
+
+const STORAGE_KEY = "option-scalper-theme";
+
+const ThemeContext = createContext(null);
 
 export function ThemeProvider({ children }) {
-  const [dark, setDark] = useState(() => {
-    try { return localStorage.getItem("scalper-theme") !== "light"; } catch { return true; }
-  });
 
-  useEffect(() => {
-    document.body.classList.toggle("light-mode", !dark);
-    try { localStorage.setItem("scalper-theme", dark ? "dark" : "light"); } catch {}
-  }, [dark]);
+    const [themeName, setThemeName] = useState(() => {
 
-  return (
-    <ThemeContext.Provider value={{ dark, toggle: () => setDark(d => !d) }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+        return localStorage.getItem(STORAGE_KEY) || "warmInk";
+
+    });
+
+    useEffect(() => {
+
+        localStorage.setItem(STORAGE_KEY, themeName);
+
+        document.documentElement.setAttribute(
+            "data-theme",
+            themeName
+        );
+
+    }, [themeName]);
+
+    const theme = useMemo(() => {
+
+        const base = themeName === "light"
+            ? light
+            : warmInk;
+
+        return {
+
+            ...base,
+
+            spacing,
+
+            radius,
+
+            typography,
+
+            shadows,
+
+            motion
+
+        };
+
+    }, [themeName]);
+
+    const value = {
+
+        theme,
+
+        themeName,
+
+        isDark: themeName === "warmInk",
+
+        setTheme: setThemeName,
+
+        toggleTheme: () => {
+
+            setThemeName(current =>
+                current === "light"
+                    ? "warmInk"
+                    : "light"
+            );
+
+        }
+
+    };
+
+    return (
+
+        <ThemeContext.Provider value={value}>
+
+            {children}
+
+        </ThemeContext.Provider>
+
+    );
+
 }
 
-export const useTheme = () => useContext(ThemeContext);
+export function useTheme() {
+
+    return useContext(ThemeContext);
+
+}

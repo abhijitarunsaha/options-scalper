@@ -51,3 +51,8 @@ export const gradientText = (color1, color2) => ({
   WebkitTextFillColor: "transparent",
   backgroundClip: "text",
 });
+
+export {
+    useTheme,
+    ThemeProvider
+} from "./ThemeContext";
