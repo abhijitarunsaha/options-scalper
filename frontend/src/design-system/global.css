@@ -1,0 +1,70 @@
+@import "./tokens.css";
+@import "./animations.css";
+
+/* Fonts */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap");
+
+/* Reset */
+
+*,
+*::before,
+*::after{
+    box-sizing:border-box;
+}
+
+html,
+body,
+#root{
+
+    margin:0;
+    padding:0;
+
+    width:100%;
+    height:100%;
+
+}
+
+body{
+
+    background:var(--bg);
+    color:var(--text);
+
+    font-family:var(--font-ui);
+
+    transition:
+        background var(--transition-normal),
+        color var(--transition-normal);
+
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+
+}
+
+/* Scrollbar */
+
+::-webkit-scrollbar{
+
+    width:10px;
+    height:10px;
+
+}
+
+::-webkit-scrollbar-thumb{
+
+    background:var(--bg4);
+    border-radius:999px;
+
+}
+
+::-webkit-scrollbar-track{
+
+    background:transparent;
+
+}
+
+::selection{
+
+    background:var(--brandDim);
+
+}

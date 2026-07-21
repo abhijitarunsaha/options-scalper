@@ -1,35 +1,51 @@
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { T } from "../theme";
+import TerminalPanel from "./ui/TerminalPanel";
 
 export default function OIChain({ ltp, index }) {
-  const [chain,   setChain]   = useState([]);
+  const [chain, setChain] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  const actionButton = {
+    fontSize: 11,
+    padding: "4px 10px",
+    borderRadius: 8,
+    border: "1px solid var(--border)",
+    background: "var(--bg4)",
+    color: "var(--text2)",
+    cursor: "pointer"
+  };
 
   const load = useCallback(() => {
     if (!ltp) return;
     setLoading(true);
     axios.get(`/data/oi-chain?range_pts=200&index=${index || "NIFTY"}`)
       .then(r => setChain(r.data.chain || []))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, [ltp, index]);
 
   useEffect(() => { load(); }, [load]);
 
   const step = index === "BANKNIFTY" || index === "SENSEX" ? 100 : 50;
-  const atm  = ltp ? Math.round(ltp / step) * step : 0;
+  const atm = ltp ? Math.round(ltp / step) * step : 0;
   const maxOI = Math.max(...chain.map(r => Math.max(r.ce_oi || 0, r.pe_oi || 0)), 1);
 
   return (
-    <div style={{ background: "var(--glass2)", border: "1px solid var(--border)", borderRadius: "var(--radius2)", overflow: "hidden", backdropFilter: "blur(12px)", boxShadow: "var(--shadow)" }}>
-      <div style={{ padding: "12px 16px", background: "var(--bg3)", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          <span style={{ fontWeight: 600, color: "var(--text)", fontSize: 13 }}>Option Chain</span>
-          <span style={{ fontSize: 10, color: "var(--muted)", marginLeft: 8 }}>±200 pts from ATM</span>
-        </div>
-        <button onClick={load} style={{ fontSize: 11, color: "var(--text2)", background: "var(--bg4)", border: "1px solid var(--border)", borderRadius: 7, padding: "3px 10px" }}>↺ Refresh</button>
-      </div>
+    <TerminalPanel
+      icon="📊"
+      title="Option Chain"
+      subtitle="±200 pts around ATM"
+      actions={
+        <button
+          onClick={load}
+          style={actionButton}
+        >
+          ↻ Refresh
+        </button>
+      }
+    >
 
       <div style={{ padding: "10px 16px", overflowX: "auto" }}>
         {loading ? (
@@ -87,6 +103,6 @@ export default function OIChain({ ltp, index }) {
           </table>
         )}
       </div>
-    </div>
+    </TerminalPanel>
   );
 }

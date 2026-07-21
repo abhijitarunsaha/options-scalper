@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { T, tierMeta } from "../theme";
+import TerminalPanel from "./ui/TerminalPanel";
 
 export default function RecommendPanel({ signal, index, defaultBudget }) {
-  const [budget,  setBudget]  = useState(defaultBudget || 2500);
-  const [lots,    setLots]    = useState("1");
-  const [limit,   setLimit]   = useState("");
-  const [data,    setData]    = useState(null);
+  const [budget, setBudget] = useState(defaultBudget || 2500);
+  const [lots, setLots] = useState("1");
+  const [limit, setLimit] = useState("");
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [placing, setPlacing] = useState(false);
-  const [msg,     setMsg]     = useState(null);
+  const [msg, setMsg] = useState(null);
 
   const load = useCallback(() => {
     if (!signal || signal.signal === "WAIT" || !signal.actionable) { setData(null); return; }
@@ -42,7 +43,7 @@ export default function RecommendPanel({ signal, index, defaultBudget }) {
   if (!signal || signal.signal === "WAIT") return null;
   const isCE = signal.signal === "CE_BUY";
   const sigColor = isCE ? "var(--green)" : "var(--red)";
-  const sigBg    = isCE ? "var(--greenDim)" : "var(--redDim)";
+  const sigBg = isCE ? "var(--greenDim)" : "var(--redDim)";
 
   if (!signal.actionable) {
     return (
@@ -56,8 +57,8 @@ export default function RecommendPanel({ signal, index, defaultBudget }) {
     );
   }
   const best = data?.best;
-  const all  = data?.all_opts || [];
-  const tm   = tierMeta(signal.tier);
+  const all = data?.all_opts || [];
+  const tm = tierMeta(signal.tier);
 
   const MetricBox = ({ label, value, color }) => (
     <div style={{ background: "var(--bg4)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px" }}>
@@ -67,33 +68,33 @@ export default function RecommendPanel({ signal, index, defaultBudget }) {
   );
 
   return (
-    <div style={{ background: "var(--glass2)", border: `1px solid ${isCE ? "rgba(34,212,131,.2)" : "rgba(245,65,93,.2)"}`, borderRadius: "var(--radius2)", overflow: "hidden", backdropFilter: "blur(12px)", boxShadow: "var(--shadow)" }}>
-      {/* Header */}
-      <div style={{ padding: "12px 16px", background: sigBg, borderBottom: `1px solid ${isCE ? "rgba(34,212,131,.15)" : "rgba(245,65,93,.15)"}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: sigBg, border: `1px solid ${sigColor}33`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
-            {isCE ? "▲" : "▼"}
-          </div>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: sigColor }}>{isCE ? "CE BUY" : "PE BUY"} Recommendation</div>
-            {signal.tier && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 5, background: tm.bg, color: tm.color }}>{tm.icon} {tm.label}</span>}
-          </div>
+
+
+    <TerminalPanel icon={isCE ? "📈" : "📉"} title={`${isCE ? "CE BUY" : "PE BUY"} Recommendation`} subtitle={best ? best.symbol : "Scanning option chain"}>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+
+        <div style={{ width: 42, height: 42, borderRadius: 12, background: sigBg, display: "flex", justifyContent: "center", alignItems: "center", fontSize: 20 }}>
+          {isCE ? "▲" : "▼"}
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <label style={{ fontSize: 10, color: "var(--text2)" }}>Max Budget (₹)</label>
-            <input type="number" value={budget} onChange={e => setBudget(+e.target.value)} onBlur={load}
-              style={{ width: 85, padding: "5px 9px", background: "var(--bg)", border: "1px solid var(--border2)", borderRadius: 8, color: "var(--text)", fontSize: 12, fontFamily: T.mono }} />
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <label style={{ fontSize: 10, color: "var(--text2)" }}>Lots</label>
-            <select value={lots} onChange={e => setLots(e.target.value)}
-              style={{ padding: "5px 9px", background: "var(--bg)", border: "1px solid var(--border2)", borderRadius: 8, color: "var(--text)", fontSize: 12, cursor: "pointer" }}>
-              <option value="1">1 lot{best ? ` (${best.lot_size} qty)` : ""}</option>
-              <option value="2">2 lots{best ? ` (${best.lot_size * 2} qty)` : ""}</option>
-            </select>
-          </div>
+
+        <div>
+          {signal.tier &&
+            <span
+              style={{
+                fontSize: 10,
+                padding: "2px 8px",
+                borderRadius: 6,
+                background: tm.bg,
+                color: tm.color,
+                fontWeight: 700
+              }}
+            >
+              {tm.icon} {tm.label}
+            </span>
+          }
         </div>
+
       </div>
 
       <div style={{ padding: "14px 16px" }}>
@@ -135,9 +136,9 @@ export default function RecommendPanel({ signal, index, defaultBudget }) {
 
               {/* Trade levels */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(110px,1fr))", gap: 7, marginBottom: 14 }}>
-                <MetricBox label="Entry LTP"    value={`₹${best.entry_ltp}`} color="var(--accent)" />
+                <MetricBox label="Entry LTP" value={`₹${best.entry_ltp}`} color="var(--accent)" />
                 <MetricBox label={`SL −${best.sl_pct}%`} value={`₹${best.sl_ltp}`} color="var(--red)" />
-                <MetricBox label="Take Profit"  value={`₹${best.target_ltp}`} color="var(--green)" />
+                <MetricBox label="Take Profit" value={`₹${best.target_ltp}`} color="var(--green)" />
                 <MetricBox label="Index Target" value={best.target_index?.toFixed(0)} color="var(--gold)" />
                 <MetricBox label={`${parseInt(lots)}L Cost`} value={`₹${parseInt(lots) === 1 ? best.lot_cost_1 : best.lot_cost_2}`} color="var(--text2)" />
                 <MetricBox label="OI" value={(best.oi / 100000).toFixed(1) + "L"} color="var(--text2)" />
@@ -173,7 +174,7 @@ export default function RecommendPanel({ signal, index, defaultBudget }) {
                 <summary style={{ fontSize: 11, color: "var(--text2)", cursor: "pointer", marginBottom: 8, userSelect: "none" }}>All {all.length} options within budget ▾</summary>
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-                    <thead><tr style={{ borderBottom: "1px solid var(--border)" }}>{["Symbol","Strike","Money","LTP","1L","2L","Δ","OI","Score"].map(h => (
+                    <thead><tr style={{ borderBottom: "1px solid var(--border)" }}>{["Symbol", "Strike", "Money", "LTP", "1L", "2L", "Δ", "OI", "Score"].map(h => (
                       <th key={h} style={{ padding: "5px 7px", textAlign: "left", color: "var(--muted)", fontSize: 9, textTransform: "uppercase", letterSpacing: ".05em" }}>{h}</th>
                     ))}</tr></thead>
                     <tbody>{all.map((o, i) => (
@@ -196,6 +197,6 @@ export default function RecommendPanel({ signal, index, defaultBudget }) {
           </>
         )}
       </div>
-    </div>
+    </TerminalPanel>
   );
 }
