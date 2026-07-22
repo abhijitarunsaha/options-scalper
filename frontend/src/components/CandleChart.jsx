@@ -2,8 +2,8 @@ import React, { useEffect, useRef } from "react";
 import { createChart, CrosshairMode, LineStyle } from "lightweight-charts";
 
 const FIB_COLORS = {
-  "0":"#334155","23.6":"#475569","38.2":"#f5a623",
-  "50.0":"#94a3b8","61.8":"#f5a623","78.6":"#475569","100":"#334155"
+  "0":"#7A7061","23.6":"#8A7F69","38.2":"#E0A02E",
+  "50.0":"#B4A890","61.8":"#E0A02E","78.6":"#8A7F69","100":"#7A7061"
 };
 
 // IST offset: UTC+5:30 = 19800 seconds
@@ -41,8 +41,8 @@ export default function CandleChart({ candles, fibonacci }) {
     if (!ref.current) return;
 
     const isDark = !document.body.classList.contains("light-mode");
-    const bgColor    = isDark ? "#0a0d14" : "#ffffff";
-    const textColor  = isDark ? "#8892a4" : "#4a5568";
+    const bgColor    = isDark ? "#171310" : "#FAF6EC";
+    const textColor  = isDark ? "#B4A890" : "#5C5340";
     const gridColor  = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)";
     const borderCol  = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.1)";
 
@@ -80,15 +80,15 @@ export default function CandleChart({ candles, fibonacci }) {
     chart.current = c;
 
     series.current.candle = c.addCandlestickSeries({
-      upColor: "#22d483", downColor: "#f5415d",
-      borderUpColor: "#22d483", borderDownColor: "#f5415d",
-      wickUpColor: "#22d483", wickDownColor: "#f5415d",
+      upColor: "#1FAE72", downColor: "#E1476B",
+      borderUpColor: "#1FAE72", borderDownColor: "#E1476B",
+      wickUpColor: "#1FAE72", wickDownColor: "#E1476B",
     });
     series.current.bbUpper = c.addLineSeries({ color: "rgba(124,111,247,0.5)", lineWidth: 1, lineStyle: LineStyle.Dashed, title: "BB↑" });
     series.current.bbMid   = c.addLineSeries({ color: "rgba(124,111,247,0.25)", lineWidth: 1, lineStyle: LineStyle.Dotted, title: "BB" });
     series.current.bbLower = c.addLineSeries({ color: "rgba(124,111,247,0.5)", lineWidth: 1, lineStyle: LineStyle.Dashed, title: "BB↓" });
-    series.current.ema9    = c.addLineSeries({ color: "#4f8ef7", lineWidth: 1.5, title: "EMA9" });
-    series.current.ema21   = c.addLineSeries({ color: "#f5a623", lineWidth: 1.5, title: "EMA21" });
+    series.current.ema9    = c.addLineSeries({ color: "#3F5FE0", lineWidth: 1.5, title: "EMA9" });
+    series.current.ema21   = c.addLineSeries({ color: "#E0A02E", lineWidth: 1.5, title: "EMA21" });
     series.current.vwap    = c.addLineSeries({ color: "rgba(255,255,255,0.45)", lineWidth: 1, lineStyle: LineStyle.Dashed, title: "VWAP" });
 
     const ro = new ResizeObserver(() => {
@@ -100,7 +100,7 @@ export default function CandleChart({ candles, fibonacci }) {
     const mo = new MutationObserver(() => {
       const isD = !document.body.classList.contains("light-mode");
       c.applyOptions({
-        layout: { background: { color: isD ? "#0a0d14" : "#ffffff" }, textColor: isD ? "#8892a4" : "#4a5568" },
+        layout: { background: { color: isD ? "#171310" : "#FAF6EC" }, textColor: isD ? "#B4A890" : "#5C5340" },
         grid:   { vertLines: { color: isD ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)" }, horzLines: { color: isD ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)" } },
       });
     });
@@ -133,7 +133,7 @@ export default function CandleChart({ candles, fibonacci }) {
     fibLines.current = [];
     Object.entries(fibonacci).forEach(([lvl, price]) => {
       const line = series.current.candle?.createPriceLine({
-        price, color: FIB_COLORS[lvl] || "#475569", lineWidth: 1,
+        price, color: FIB_COLORS[lvl] || "#8A7F69", lineWidth: 1,
         lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: `Fib ${lvl}%`,
       });
       if (line) fibLines.current.push(line);
@@ -144,7 +144,7 @@ export default function CandleChart({ candles, fibonacci }) {
     <div style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: "var(--radius2)", overflow: "hidden", boxShadow: "var(--shadow)" }}>
       <div style={{ padding: "10px 14px 0", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>1-min Chart</span>
-        {[["EMA9", "#4f8ef7"], ["EMA21", "#f5a623"], ["VWAP", "rgba(255,255,255,0.6)"], ["BB", "rgba(124,111,247,0.7)"]].map(([l, c]) => (
+        {[["EMA9", "#3F5FE0"], ["EMA21", "#E0A02E"], ["VWAP", "rgba(230,220,200,0.6)"], ["BB", "rgba(139,108,240,0.7)"]].map(([l, c]) => (
           <span key={l} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "var(--text2)" }}>
             <span style={{ width: 20, height: 2, background: c, display: "inline-block", borderRadius: 1 }} />{l}
           </span>

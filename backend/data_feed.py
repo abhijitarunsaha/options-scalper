@@ -62,6 +62,7 @@ def stop_ticker():
     candles.clear()
 
 def get_candles() -> list: return list(candles)
+def get_current_candle() -> dict | None: return dict(current_candle) if current_candle else None
 def get_active_index() -> str: return _active_index
 def register_broadcast(cb):
     if cb not in broadcast_callbacks: broadcast_callbacks.append(cb)

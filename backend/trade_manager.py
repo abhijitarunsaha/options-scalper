@@ -211,3 +211,99 @@ def refresh_live_pnl():
 
 def get_active_trades(): return [t for t in _trades.values() if t["status"] in ("PENDING","OPEN")]
 def get_all_trades():    return list(_trades.values())
+
+# ── Generic Zerodha day report + order controls ─────────────────────────────
+# These operate directly against Kite (orders/positions), so they cover
+# positions placed manually in Zerodha as well as trades placed by this tool —
+# unlike get_all_trades() above, which only knows about this tool's own trades.
+
+_PENDING_KITE_STATUSES = {"OPEN", "TRIGGER PENDING", "PUT ORDER REQ RECEIVED", "MODIFY_PENDING", "MODIFY PENDING", "VALIDATION PENDING", "AMO REQ RECEIVED"}
+
+def get_day_report():
+    kite = get_kite()
+    try: positions = kite.positions().get("day", [])
+    except Exception as e: print(f"[TM] positions: {e}"); positions = []
+    try: orders = kite.orders()
+    except Exception as e: print(f"[TM] orders: {e}"); orders = []
+
+    quote_keys = [f"{p['exchange']}:{p['tradingsymbol']}" for p in positions if p.get("quantity", 0) != 0]
+    quotes = {}
+    if quote_keys:
+        try: quotes = kite.quote(list(set(quote_keys)))
+        except Exception as e: print(f"[TM] quotes: {e}")
+
+    open_positions, closed_positions = [], []
+    total_realized = total_unrealized = 0.0
+    for p in positions:
+        sym, qty = p["tradingsymbol"], int(p.get("quantity", 0))
+        pnl = round(float(p.get("pnl", 0) or 0), 2)
+        row = {
+            "symbol": sym, "exchange": p.get("exchange"), "product": p.get("product"),
+            "buy_qty": p.get("buy_quantity"), "sell_qty": p.get("sell_quantity"),
+            "buy_avg": p.get("buy_price"), "sell_avg": p.get("sell_price"),
+            "net_qty": qty, "pnl": pnl, "close_price": p.get("close_price"),
+        }
+        if qty == 0:
+            row["last_price"] = p.get("last_price")
+            closed_positions.append(row); total_realized += pnl
+        else:
+            key = f"{p['exchange']}:{sym}"
+            row["ltp"] = (quotes.get(key) or {}).get("last_price", p.get("last_price"))
+            open_positions.append(row); total_unrealized += pnl
+
+    order_book = [{
+        "order_id": o.get("order_id"), "symbol": o.get("tradingsymbol"),
+        "exchange": o.get("exchange"), "side": o.get("transaction_type"),
+        "qty": o.get("quantity"), "filled_qty": o.get("filled_quantity"),
+        "price": o.get("price"), "trigger_price": o.get("trigger_price"),
+        "avg_price": o.get("average_price"), "status": o.get("status"),
+        "order_type": o.get("order_type"), "product": o.get("product"),
+        "placed_at": str(o.get("order_timestamp") or ""),
+        "status_message": o.get("status_message"),
+    } for o in orders]
+    pending_orders = [o for o in order_book if (o["status"] or "").upper() in _PENDING_KITE_STATUSES]
+
+    wins  = sum(1 for c in closed_positions if c["pnl"] > 0)
+    losses = sum(1 for c in closed_positions if c["pnl"] < 0)
+    flat  = len(closed_positions) - wins - losses
+
+    return {
+        "open_positions": open_positions, "closed_positions": closed_positions,
+        "orders": order_book, "pending_orders": pending_orders,
+        "total_realized_pnl": round(total_realized, 2),
+        "total_unrealized_pnl": round(total_unrealized, 2),
+        "total_pnl": round(total_realized + total_unrealized, 2),
+        "win_count": wins, "loss_count": losses, "flat_count": flat,
+        "open_count": len(open_positions),
+    }
+
+def modify_kite_order(order_id, new_price=None, new_qty=None, trigger_price=None, order_type=None):
+    kite = get_kite()
+    kwargs = {}
+    if new_price is not None:    kwargs["price"] = _tick(float(new_price))
+    if new_qty is not None:      kwargs["quantity"] = int(new_qty)
+    if trigger_price is not None: kwargs["trigger_price"] = _tick(float(trigger_price))
+    if order_type:                kwargs["order_type"] = order_type
+    if not kwargs: raise ValueError("Provide new_price, new_qty, trigger_price, or order_type")
+    return kite.modify_order(variety=kite.VARIETY_REGULAR, order_id=str(order_id), **kwargs)
+
+def cancel_kite_order(order_id):
+    kite = get_kite()
+    return kite.cancel_order(variety=kite.VARIETY_REGULAR, order_id=str(order_id))
+
+def exit_kite_position(exchange, tradingsymbol, qty, product, limit_price=None):
+    """Square off any open position (bot-placed or manual) with a LIMIT sell,
+    priced just under the live LTP so it fills promptly."""
+    kite = get_kite()
+    ltp = None
+    try:
+        key = f"{exchange}:{tradingsymbol}"
+        ltp = (kite.quote([key]).get(key) or {}).get("last_price")
+    except Exception as e: print(f"[TM] exit quote: {e}")
+    ref = limit_price or ltp
+    if not ref: raise ValueError("No LTP available to price the exit order")
+    price = _tick(float(ref) * 0.995) if not limit_price else _tick(float(limit_price))
+    return kite.place_order(tradingsymbol=tradingsymbol, exchange=exchange,
+                             transaction_type=kite.TRANSACTION_TYPE_SELL, quantity=int(qty),
+                             order_type=kite.ORDER_TYPE_LIMIT, price=price,
+                             product=product or kite.PRODUCT_MIS, variety=kite.VARIETY_REGULAR)

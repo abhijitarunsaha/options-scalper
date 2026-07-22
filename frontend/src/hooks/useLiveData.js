@@ -11,6 +11,7 @@ export default function useLiveData(activeIndex) {
   const [fiiDii,     setFiiDii]     = useState({});
   const [connected,  setConnected]  = useState(false);
   const [authError,  setAuthError]  = useState(null);
+  const [refreshSeconds, setRefreshSecondsState] = useState(5);
   const alive = useRef(true);
   const wsRef = useRef(null);
   const pingRef = useRef(null);
@@ -31,12 +32,16 @@ export default function useLiveData(activeIndex) {
     ws.onmessage = (e) => {
       try {
         const d = JSON.parse(e.data);
-        if (d.candle) setCandles(prev => { const ex=prev.some(c=>c.time===d.candle.time); return ex?prev.map(c=>c.time===d.candle.time?d.candle:c):[...prev,d.candle]; });
+        // Closed-candle broadcasts append to history; partial (fast-refresh)
+        // broadcasts only refresh the live signal/indicator readout so the
+        // pattern/signal checklist doesn't wait on the full 1-min bar.
+        if (d.candle && !d.partial) setCandles(prev => { const ex=prev.some(c=>c.time===d.candle.time); return ex?prev.map(c=>c.time===d.candle.time?d.candle:c):[...prev,d.candle]; });
         if (d.signal)     setSignal(d.signal);
         if (d.indicators) setIndicators(d.indicators);
         if (d.fibonacci)  setFibonacci(d.fibonacci);
         if (d.trend)      setTrend(d.trend);
         if (d.fii_dii)    setFiiDii(d.fii_dii);
+        if (d.refresh_seconds) setRefreshSecondsState(d.refresh_seconds);
       } catch {}
     };
   }
@@ -47,6 +52,9 @@ export default function useLiveData(activeIndex) {
       if (r.data.fibonacci) setFibonacci(r.data.fibonacci);
       if (r.data.trend)     setTrend(r.data.trend);
     }).catch(()=>{});
+    axios.get("/data/refresh-interval").then(r => {
+      if (r.data.refresh_seconds) setRefreshSecondsState(r.data.refresh_seconds);
+    }).catch(()=>{});
   }, [activeIndex]);
 
   useEffect(() => {
@@ -54,5 +62,10 @@ export default function useLiveData(activeIndex) {
     return () => { alive.current=false; clearInterval(pingRef.current); wsRef.current?.close(); };
   }, [connect]);
 
-  return { candles, signal, indicators, fibonacci, trend, fiiDii, connected, authError };
+  const setRefreshSeconds = useCallback(async (secs) => {
+    setRefreshSecondsState(secs);
+    try { await axios.post(`/data/refresh-interval?seconds=${secs}`); } catch {}
+  }, []);
+
+  return { candles, signal, indicators, fibonacci, trend, fiiDii, connected, authError, refreshSeconds, setRefreshSeconds };
 }

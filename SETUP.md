@@ -1,4 +1,4 @@
-# NIFTY50 Scalper — Setup Guide
+# Sigmatics — Setup Guide
 
 ## Prerequisites
 - Python 3.10+, Node.js 18+, pip, npm

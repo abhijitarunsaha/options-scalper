@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { T, tierMeta, pnlColor, regimeMeta } from "../theme";
 import { useTheme } from "../ThemeContext";
 import ConfirmationRing from "./ConfirmationRing";
+import Logo from "./Logo";
 
 function useClock() {
   const [t, setT] = useState(() => new Date().toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour12: true }));
@@ -12,7 +13,7 @@ function useClock() {
   return t;
 }
 
-const TABS = ["Live", "Portfolio", "Trades", "Report"];
+const TABS = ["Dashboard", "Portfolio", "Reports"];
 const INDICES = ["NIFTY", "BANKNIFTY", "SENSEX"];
 
 export default function TopBar({ connected, authError, ltp, index, onIndex, onReload, candles, minCandles, signal, totalPnl, activeTab, onTab }) {
@@ -35,10 +36,7 @@ export default function TopBar({ connected, authError, ltp, index, onIndex, onRe
 
       {/* Wordmark + index tabs */}
       <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
-          <span style={{ fontFamily: T.display, fontWeight: 700, fontSize: 17, color: T.text, letterSpacing: "-.02em" }}>Option</span>
-          <span style={{ fontFamily: T.display, fontWeight: 700, fontSize: 17, color: "var(--brand)", letterSpacing: "-.02em" }}>Scalper</span>
-        </div>
+        <Logo size={26} wordSize={17} />
 
         <div style={{ display: "flex", gap: 2, background: "var(--bg4)", borderRadius: 10, padding: 3 }}>
           {INDICES.map(idx => (

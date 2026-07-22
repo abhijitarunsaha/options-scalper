@@ -1,5 +1,5 @@
 """
-main.py — FastAPI backend for NIFTY50 Scalper
+main.py — FastAPI backend for Sigmatics
 """
 import os, json, asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
@@ -8,30 +8,37 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
 from kite_auth import get_login_url, generate_session, check_session
-from data_feed import start_ticker, stop_ticker, get_candles, get_active_index, register_broadcast, set_event_loop, switch_index
+from data_feed import (start_ticker, stop_ticker, get_candles, get_current_candle,
+    get_active_index, register_broadcast, set_event_loop, switch_index)
 from indicators import compute_all
 from signal_engine import evaluate_signals
 from option_filter import get_affordable_options, get_oi_chain, get_vix
 from fii_dii import get_fii_dii
 import portfolio
 from trade_manager import (place_trade, exit_trade, cancel_order, modify_order,
-    get_active_trades, get_all_trades, refresh_live_pnl, refresh_order_statuses)
+    get_active_trades, get_all_trades, refresh_live_pnl, refresh_order_statuses,
+    get_day_report, modify_kite_order, cancel_kite_order, exit_kite_position)
 from config import get_index_cfg, BUDGET_PER_LOT, MIN_CANDLES, SL_LIMIT_PCT, TRAILING_SL_PCT
 
 load_dotenv()
-app = FastAPI(title="NIFTY50 Scalper API", version="3.0.0")
+app = FastAPI(title="Sigmatics API", version="4.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 ws_clients: list[WebSocket] = []
 _vix_cache: float | None = None
 _vix_prev:  float | None = None
 _fii_dii_cache: dict = {}
+_refresh_seconds: int = 5   # selectable 5 / 10 cadence for the fast-path signal/pattern
+                            # refresh, independent of the 1-min candle close broadcast
+_refresh_task = None
 
 # ── Startup ───────────────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup():
     loop = asyncio.get_running_loop()
     set_event_loop(loop)
+    global _refresh_task
+    _refresh_task = asyncio.create_task(_fast_refresh_loop())
     if check_session():
         start_ticker(); register_broadcast(_broadcast)
     else:
@@ -126,6 +133,43 @@ async def reload():
     register_broadcast(_broadcast)
     return {"status":"reloaded","index":idx}
 
+@app.post("/data/refresh-interval")
+async def set_refresh_interval(seconds: int = Query(...)):
+    global _refresh_seconds
+    if seconds not in (5, 10, 15, 30, 60):
+        return JSONResponse(400, {"error":"seconds must be one of 5, 10, 15, 30, 60"})
+    _refresh_seconds = seconds
+    return {"status":"ok","refresh_seconds":_refresh_seconds}
+
+@app.get("/data/refresh-interval")
+async def get_refresh_interval():
+    return {"refresh_seconds":_refresh_seconds}
+
+# ── Day report (Zerodha-sourced, covers manual + bot orders) ──────────────────
+@app.get("/trade/day-report")
+async def day_report():
+    try: return get_day_report()
+    except Exception as e: return JSONResponse(400, {"error": str(e)})
+
+@app.put("/trade/order/{order_id}/modify")
+async def modify_any_order(order_id: str, body: dict):
+    try: return {"status":"modified","order_id": modify_kite_order(order_id,
+        body.get("new_price"), body.get("new_qty"), body.get("trigger_price"), body.get("order_type"))}
+    except Exception as e: return JSONResponse(400, {"error": str(e)})
+
+@app.post("/trade/order/{order_id}/cancel")
+async def cancel_any_order(order_id: str):
+    try: return {"status":"cancelled","order_id": cancel_kite_order(order_id)}
+    except Exception as e: return JSONResponse(400, {"error": str(e)})
+
+@app.post("/trade/position/exit")
+async def exit_any_position(body: dict):
+    try:
+        oid = exit_kite_position(body["exchange"], body["tradingsymbol"],
+            body["qty"], body.get("product"), body.get("limit_price"))
+        return {"status":"exit_order_placed","order_id": oid}
+    except Exception as e: return JSONResponse(400, {"error": str(e)})
+
 # ── Trade endpoints ───────────────────────────────────────────────────────────
 @app.post("/trade/execute")
 async def execute(body: dict):
@@ -204,6 +248,38 @@ async def _broadcast(candle: dict):
         except: dead.append(ws)
     for ws in dead:
         if ws in ws_clients: ws_clients.remove(ws)
+
+async def _fast_refresh_loop():
+    """Recomputes indicators/signal/pattern using the still-forming candle and
+    pushes it to clients at the selectable cadence (default 5s), so the pattern/
+    signal checklist doesn't wait for the full 1-min bar to close. Marked
+    'partial' so the frontend can distinguish it from a closed-candle update."""
+    while True:
+        try:
+            await asyncio.sleep(_refresh_seconds)
+            if not ws_clients: continue
+            base = get_candles()
+            cur  = get_current_candle()
+            if not base and not cur: continue
+            merged = base + [cur] if cur else base
+            ind = compute_all(merged, vix=_vix_cache)
+            if not ind: continue
+            sig = evaluate_signals(merged, vix=_vix_cache, vix_prev=_vix_prev,
+                                    fii_dii=_fii_dii_cache, index=get_active_index())
+            payload = json.dumps({"partial":True,"candle":cur,"signal":sig,
+                "indicators":ind.get("latest",{}),"fibonacci":ind.get("fibonacci",{}),
+                "trend":ind.get("trend",{}),"index":get_active_index(),
+                "refresh_seconds":_refresh_seconds}, default=str)
+            dead=[]
+            for ws in ws_clients:
+                try: await ws.send_text(payload)
+                except: dead.append(ws)
+            for ws in dead:
+                if ws in ws_clients: ws_clients.remove(ws)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            print(f"[FastRefresh] {e}")
 
 def _build_signal():
     return evaluate_signals(get_candles(),vix=_vix_cache,

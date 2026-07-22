@@ -159,8 +159,8 @@ export default function RecommendPanel({ signal, index, defaultBudget }) {
               <button onClick={execute} disabled={placing} style={{
                 width: "100%", padding: "12px", borderRadius: 10, border: "none", fontWeight: 700,
                 fontSize: 13, cursor: placing ? "not-allowed" : "pointer", color: "#fff", letterSpacing: ".02em",
-                background: placing ? "var(--muted)" : isCE ? "linear-gradient(135deg,#15803d,#22d483)" : "linear-gradient(135deg,#b91c1c,#f5415d)",
-                boxShadow: placing ? "none" : isCE ? "0 4px 16px rgba(34,212,131,0.3)" : "0 4px 16px rgba(245,65,93,0.3)",
+                background: placing ? "var(--muted)" : isCE ? "linear-gradient(135deg,#0F6E4A,var(--bull))" : "linear-gradient(135deg,#8E2E48,var(--bear))",
+                boxShadow: placing ? "none" : isCE ? "0 4px 16px var(--bullGlow)" : "0 4px 16px var(--bearGlow)",
                 transition: "all .2s",
               }}>
                 {placing ? "Placing order…" : `⚡ Execute — ${lots} lot${parseInt(lots) > 1 ? "s" : ""} (${best.lot_size * parseInt(lots)} qty) @ ₹${limit || "?"}`}

@@ -1,9 +1,10 @@
-# Option Scalper — Claude Code Context
+# Sigmatics — Claude Code Context
 
 ## Project
 Real-time intraday options scalper — NIFTY, BANKNIFTY, and SENSEX.
-(Renamed from "NIFTY50 Scalper"; multi-index support was already wired
-in config.py's INDEX_MAP, so this was a naming change, not a rebuild.)
+Renamed to "Sigmatics" ("Signals through Mathematics"); multi-index support
+was already wired in config.py's INDEX_MAP, so this was a naming/rebrand
+change layered on top of a full Warm Ink UI redesign, not a rebuild.
 Backend: Python FastAPI + Kite Connect (Zerodha)
 Frontend: React 18 + TradingView Lightweight Charts
 
@@ -67,3 +68,38 @@ All qty = lots × lot_size (always valid multiple)
 Backend:  cd backend && uvicorn main:app --reload --port 8000
 Frontend: cd frontend && npm start
 Login:    GET http://localhost:8000/auth/status
+
+## Warm Ink redesign (July 2026)
+Full UI rebrand to "Sigmatics" — warm ink (not pure black) base with
+emerald/rose/marigold for CE/PE/watch and a cobalt brand accent. Light + dark
+mode via CSS vars in frontend/public/index.html; ThemeContext.js toggles a
+`light-mode` body class. Fonts: Space Grotesk (display), Inter (UI), IBM Plex
+Mono (numbers). Logo.jsx is the sigma-mark emblem (components/Logo.jsx).
+
+Tabs collapsed from [Live, Portfolio, Trades, Report] to [Dashboard, Portfolio,
+Reports] — order execution, open-position modify/cancel/exit, and the option
+chain all now live on the Dashboard tab; there's no separate Trades tab.
+The old "Live Snapshot" indicator dump was removed from the sidebar (that data
+still flows into `indicators` for backend calc/prediction use, just isn't
+rendered raw) and replaced with OIChain (option chain) in the sidebar.
+
+- DayPnlDoughnut.jsx — dashboard widget pulling GET /trade/day-report; click
+  any segment to jump to the Reports tab.
+- Reports tab (PnLReport.jsx) auto-loads on mount (no more click-to-open
+  gate) and now has a "Today's Positions" section sourced from
+  GET /trade/day-report — this pulls straight from kite.positions()/orders(),
+  so it shows positions/orders placed manually in Zerodha too, not just
+  trades placed through this tool. Modify/cancel/exit there hit the new
+  generic endpoints (trade_manager.py): modify_kite_order/cancel_kite_order/
+  exit_kite_position + PUT /trade/order/{id}/modify, POST
+  /trade/order/{id}/cancel, POST /trade/position/exit — these work on any
+  Kite order_id/position, unlike modify_order/cancel_order/exit_trade which
+  only know about this tool's own `_trades` dict.
+- Fast pattern/signal refresh: data_feed.get_current_candle() exposes the
+  still-forming candle; main.py's `_fast_refresh_loop()` background task
+  recomputes indicators/signal against base candles + the in-progress one
+  every `_refresh_seconds` (default 5) and broadcasts it over /ws/live with
+  `partial: true` — the frontend (useLiveData.js) applies it to signal/
+  indicators but does NOT append it to candle history (only real 1-min closes
+  do that). GET/POST /data/refresh-interval (5/10/15/30/60) controls the
+  cadence; SignalCard.jsx exposes a 5s/10s selector in its header.

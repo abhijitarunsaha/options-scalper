@@ -3,51 +3,56 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Option Scalper</title>
+  <title>Sigmatics</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23171310'/%3E%3Cpath d='M15 18h34l-15 14 15 14H15l13-14z' fill='none' stroke='%233F5FE0' stroke-width='4' stroke-linejoin='round' stroke-linecap='round'/%3E%3Ccircle cx='47' cy='18' r='3.2' fill='%231FAE72'/%3E%3C/svg%3E"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     :root{
-      /* ink (dark) */
-      --bg:#0B0E15;--bg2:#10141E;--bg3:#151B28;--bg4:#1B2231;--bg5:#222A3C;
-      --panel:rgba(255,255,255,0.03);--panel2:rgba(255,255,255,0.05);
-      --border:rgba(160,172,204,0.12);--border2:rgba(160,172,204,0.20);
-      --text:#E9ECF5;--text2:#93A0BC;--muted:#5A6480;--muted2:#2A3040;
+      /* Warm Ink — dark mode: warm charcoal/espresso base, not pure black */
+      --bg:#171310;--bg2:#1D1812;--bg3:#241E16;--bg4:#2C2519;--bg5:#362D1E;
+      --panel:rgba(255,247,230,0.03);--panel2:rgba(255,247,230,0.05);
+      --border:rgba(224,204,168,0.12);--border2:rgba(224,204,168,0.20);
+      --text:#F2EBDD;--text2:#B4A890;--muted:#8A7F69;--muted2:#332B1F;
       --shadow:0 4px 20px rgba(0,0,0,0.35);--shadow2:0 12px 36px rgba(0,0,0,0.45);
       --radius:10px;--radius2:14px;--radius3:20px;
 
-      /* brand + domain accents */
-      --brand:#5B7CFA;--brandDim:rgba(91,124,250,0.14);--brandGlow:rgba(91,124,250,0.35);
-      --accent:#5B7CFA;--accent2:#8B6CF0;--accent3:#2FBE83;
-      --bull:#2FBE83;--bullDim:rgba(47,190,131,0.14);--bullGlow:rgba(47,190,131,0.35);
-      --bear:#E1495F;--bearDim:rgba(225,73,95,0.14);--bearGlow:rgba(225,73,95,0.35);
-      --watch:#E8A33D;--watchDim:rgba(232,163,61,0.14);--watchGlow:rgba(232,163,61,0.35);
+      /* brand + domain accents — cobalt brand, emerald/rose/marigold CE/PE/watch */
+      --brand:#3F5FE0;--brandDim:rgba(63,95,224,0.16);--brandGlow:rgba(63,95,224,0.35);
+      --accent:#3F5FE0;--accent2:#8B6CF0;--accent3:#1FAE72;
+      --bull:#1FAE72;--bullDim:rgba(31,174,114,0.15);--bullGlow:rgba(31,174,114,0.35);
+      --bear:#E1476B;--bearDim:rgba(225,71,107,0.15);--bearGlow:rgba(225,71,107,0.35);
+      --watch:#E0A02E;--watchDim:rgba(224,160,46,0.15);--watchGlow:rgba(224,160,46,0.35);
       /* legacy aliases used across existing components */
       --green:var(--bull);--greenDim:var(--bullDim);--greenGlow:var(--bullGlow);
       --red:var(--bear);--redDim:var(--bearDim);--redGlow:var(--bearGlow);
       --gold:var(--watch);--goldDim:var(--watchDim);
       --blue:var(--brand);--blueDim:var(--brandDim);
       --glass:var(--panel);--glass2:var(--panel2);
+      /* named aliases matching the brief's palette language */
+      --emerald:var(--bull);--rose:var(--bear);--marigold:var(--watch);--cobalt:var(--brand);
 
       --font-display:'Space Grotesk',sans-serif;--font-body:'Inter',sans-serif;--mono:'IBM Plex Mono',monospace;
     }
     body.light-mode{
-      --bg:#F5F6FB;--bg2:#FFFFFF;--bg3:#F0F2F9;--bg4:#E7EAF4;--bg5:#DCE0EF;
-      --panel:rgba(20,24,40,0.03);--panel2:rgba(20,24,40,0.045);
-      --border:rgba(20,24,40,0.08);--border2:rgba(20,24,40,0.14);
-      --text:#141826;--text2:#57607A;--muted:#8891A8;--muted2:#E7EAF4;
-      --shadow:0 4px 20px rgba(20,24,50,0.06);--shadow2:0 12px 32px rgba(20,24,50,0.10);
-      --brand:#3F5FE0;--accent:#3F5FE0;--accent2:#7454D6;--accent3:#1E9E6B;
-      --bull:#1E9E6B;--bullDim:rgba(30,158,107,0.12);
-      --bear:#C93B50;--bearDim:rgba(201,59,80,0.12);
-      --watch:#C8862A;--watchDim:rgba(200,134,42,0.12);
+      /* Warm Ink — light mode: warm ivory paper, not stark white */
+      --bg:#FAF6EC;--bg2:#FFFDF8;--bg3:#F3ECDC;--bg4:#EAE0C8;--bg5:#DED2B2;
+      --panel:rgba(38,30,16,0.03);--panel2:rgba(38,30,16,0.045);
+      --border:rgba(38,30,16,0.09);--border2:rgba(38,30,16,0.15);
+      --text:#221B10;--text2:#5C5340;--muted:#8C8168;--muted2:#EAE0C8;
+      --shadow:0 4px 20px rgba(40,30,10,0.07);--shadow2:0 12px 32px rgba(40,30,10,0.11);
+      --brand:#2E4BC6;--accent:#2E4BC6;--accent2:#6E4FCB;--accent3:#188A5C;
+      --bull:#188A5C;--bullDim:rgba(24,138,92,0.12);
+      --bear:#C13A5B;--bearDim:rgba(193,58,91,0.12);
+      --watch:#B5791E;--watchDim:rgba(181,121,30,0.12);
       --green:var(--bull);--greenDim:var(--bullDim);
       --red:var(--bear);--redDim:var(--bearDim);
       --gold:var(--watch);--goldDim:var(--watchDim);
-      --blue:var(--brand);--blueDim:rgba(63,95,224,0.10);
+      --blue:var(--brand);--blueDim:rgba(46,75,198,0.10);
       --glass:var(--panel);--glass2:var(--panel2);
+      --emerald:var(--bull);--rose:var(--bear);--marigold:var(--watch);--cobalt:var(--brand);
     }
     body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:13px;line-height:1.5;overflow-x:hidden;transition:background .25s,color .25s}
     ::-webkit-scrollbar{width:5px;height:5px}

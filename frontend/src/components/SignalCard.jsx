@@ -24,7 +24,23 @@ function MiniPill({ label, value, color }) {
   );
 }
 
-export default function SignalCard({ signal, indicators, fiiDii }) {
+function RefreshSelect({ value, onChange }) {
+  if (!onChange) return null;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+      <span style={{ fontSize: 9, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".05em" }}>Pattern refresh</span>
+      <select value={value} onChange={e => onChange(parseInt(e.target.value))} style={{
+        padding: "3px 8px", background: "var(--bg4)", border: "1px solid var(--border)",
+        borderRadius: 7, color: "var(--text)", fontSize: 11, fontFamily: T.mono,
+      }}>
+        <option value={5}>5s</option>
+        <option value={10}>10s</option>
+      </select>
+    </div>
+  );
+}
+
+export default function SignalCard({ signal, indicators, fiiDii, refreshSeconds, onSetRefreshSeconds }) {
   const isCE = signal?.signal === "CE_BUY", isPE = signal?.signal === "PE_BUY";
   const isWait = !isCE && !isPE;
   const tier = signal?.tier;
@@ -121,7 +137,8 @@ export default function SignalCard({ signal, indicators, fiiDii }) {
             {fd.as_of && <span style={{ fontSize: 9, color: "var(--muted)" }}>@{fd.as_of}</span>}
           </div>
         )}
-        {signal?.reason && <span style={{ fontSize: 10, color: "var(--muted)", marginLeft: "auto" }}>{signal.reason}</span>}
+        {signal?.reason && <span style={{ fontSize: 10, color: "var(--muted)" }}>{signal.reason}</span>}
+        <div style={{ marginLeft: "auto" }}><RefreshSelect value={refreshSeconds || 5} onChange={onSetRefreshSeconds} /></div>
       </div>
 
       <div style={{ padding: "12px 16px" }}>
