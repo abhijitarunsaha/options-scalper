@@ -16,7 +16,7 @@ import {
     motion
 } from "./design-system";
 
-const STORAGE_KEY = "option-scalper-theme";
+const STORAGE_KEY = "sigmatics-theme";
 
 const ThemeContext = createContext(null);
 

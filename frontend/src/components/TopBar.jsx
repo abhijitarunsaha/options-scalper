@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { T, tierMeta, pnlColor, regimeMeta } from "../theme";
 import { useTheme } from "../ThemeContext";
 import ConfirmationRing from "./ConfirmationRing";
+import Brand from "../components/Brand";
 
 function useClock() {
   const [t, setT] = useState(() => new Date().toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour12: true }));
@@ -17,7 +18,10 @@ const INDICES = ["NIFTY", "BANKNIFTY", "SENSEX"];
 
 export default function TopBar({ connected, authError, ltp, index, onIndex, onReload, candles, minCandles, signal, totalPnl, activeTab, onTab }) {
   const clock = useClock();
-  const {themeName, isDark, toggleTheme} = useTheme();
+  const {
+    isDark,
+    toggleTheme
+  } = useTheme();
   const tier = signal?.tier;
   const sig = signal?.signal;
   const isCE = sig === "CE_BUY", isPE = sig === "PE_BUY";
@@ -36,8 +40,7 @@ export default function TopBar({ connected, authError, ltp, index, onIndex, onRe
       {/* Wordmark + index tabs */}
       <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
-          <span style={{ fontFamily: T.display, fontWeight: 700, fontSize: 17, color: T.text, letterSpacing: "-.02em" }}>Option</span>
-          <span style={{ fontFamily: T.display, fontWeight: 700, fontSize: 17, color: "var(--brand)", letterSpacing: "-.02em" }}>Scalper</span>
+          <Brand />
         </div>
 
         <div style={{ display: "flex", gap: 2, background: "var(--bg4)", borderRadius: 10, padding: 3 }}>
@@ -69,10 +72,10 @@ export default function TopBar({ connected, authError, ltp, index, onIndex, onRe
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         {ltp && (
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontFamily: T.mono, fontSize: 17, fontWeight: 600, color: T.text }}>
+            <div style={{ fontFamily: T.mono, fontSize: 17, fontWeight: 600, color: "var(--text)" }}>
               ₹{ltp.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </div>
-            <div style={{ fontSize: 9, color: T.muted, textTransform: "uppercase", letterSpacing: ".07em" }}>{index} · {clock}</div>
+            <div style={{ fontSize: 9, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".07em" }}>{index} · {clock}</div>
           </div>
         )}
         {warm && (
@@ -107,7 +110,7 @@ export default function TopBar({ connected, authError, ltp, index, onIndex, onRe
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {totalPnl != null && (
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 9, color: T.muted, textTransform: "uppercase", letterSpacing: ".05em" }}>Session P&L</div>
+            <div style={{ fontSize: 9, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".05em" }}>Session P&L</div>
             <div style={{ fontFamily: T.mono, fontSize: 13, fontWeight: 600, color: pnlColor(totalPnl) }}>
               {totalPnl >= 0 ? "+" : ""}₹{Math.abs(totalPnl).toFixed(2)}
             </div>
@@ -131,11 +134,26 @@ export default function TopBar({ connected, authError, ltp, index, onIndex, onRe
           </div>
         )}
 
-        <button onClick={toggleTheme} aria-label="Toggle theme" style={{
-          width: 32, height: 32, borderRadius: 9, border: "1px solid var(--border)",
-          background: "var(--bg4)", color: "var(--text2)", fontSize: 13, fontWeight: 600,
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>{isDark ? "☾" : "☀"}</button>
+        <button
+          onClick={toggleTheme}
+          aria-label="Toggle theme"
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 9,
+            border: "1px solid var(--border)",
+            background: "var(--bg4)",
+            color: "var(--text2)",
+            fontSize: 13,
+            fontWeight: 600,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+          }}
+        >
+          {isDark ? "☾" : "☀"}
+        </button>
 
         <button onClick={onReload} aria-label="Reload" style={{
           width: 32, height: 32, borderRadius: 9, border: "1px solid var(--border)",
