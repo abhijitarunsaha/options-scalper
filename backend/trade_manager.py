@@ -307,3 +307,40 @@ def exit_kite_position(exchange, tradingsymbol, qty, product, limit_price=None):
                              transaction_type=kite.TRANSACTION_TYPE_SELL, quantity=int(qty),
                              order_type=kite.ORDER_TYPE_LIMIT, price=price,
                              product=product or kite.PRODUCT_MIS, variety=kite.VARIETY_REGULAR)
+
+# ── Generic GTT stop-loss controls ───────────────────────────────────────────
+# Unlike _execute_sl/_update_gtt above (which only manage the GTT this tool
+# itself created for a bot trade), these work on ANY open position — including
+# ones placed directly in Zerodha — since the UI now exposes SL management on
+# the Positions panel for everything the day-report shows, not just bot trades.
+
+def list_kite_gtts():
+    return get_kite().get_gtts()
+
+def place_kite_gtt_sl(exchange, tradingsymbol, qty, trigger_price, limit_price=None, last_price=None, product=None):
+    kite = get_kite()
+    trigger_price = float(trigger_price)
+    limit_price = _tick(float(limit_price)) if limit_price else _tick(trigger_price * 0.995)
+    last_price  = float(last_price) if last_price else trigger_price
+    return kite.place_gtt(trigger_type=kite.GTT_TYPE_SINGLE, tradingsymbol=tradingsymbol,
+                           exchange=exchange, trigger_values=[trigger_price], last_price=last_price,
+                           orders=[{"exchange": exchange, "tradingsymbol": tradingsymbol,
+                                    "transaction_type": kite.TRANSACTION_TYPE_SELL,
+                                    "quantity": int(qty), "order_type": kite.ORDER_TYPE_LIMIT,
+                                    "price": limit_price, "product": product or kite.PRODUCT_MIS}])
+
+def modify_kite_gtt_sl(gtt_id, exchange, tradingsymbol, qty, trigger_price, limit_price=None, last_price=None, product=None):
+    kite = get_kite()
+    trigger_price = float(trigger_price)
+    limit_price = _tick(float(limit_price)) if limit_price else _tick(trigger_price * 0.995)
+    last_price  = float(last_price) if last_price else trigger_price
+    return kite.modify_gtt(trigger_id=int(gtt_id), trigger_type=kite.GTT_TYPE_SINGLE,
+                           tradingsymbol=tradingsymbol, exchange=exchange,
+                           trigger_values=[trigger_price], last_price=last_price,
+                           orders=[{"exchange": exchange, "tradingsymbol": tradingsymbol,
+                                    "transaction_type": kite.TRANSACTION_TYPE_SELL,
+                                    "quantity": int(qty), "order_type": kite.ORDER_TYPE_LIMIT,
+                                    "price": limit_price, "product": product or kite.PRODUCT_MIS}])
+
+def cancel_kite_gtt(gtt_id):
+    return get_kite().delete_gtt(int(gtt_id))

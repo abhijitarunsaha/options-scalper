@@ -15,9 +15,11 @@ from signal_engine import evaluate_signals
 from option_filter import get_affordable_options, get_oi_chain, get_vix
 from fii_dii import get_fii_dii
 import portfolio
+import oi_tracker
 from trade_manager import (place_trade, exit_trade, cancel_order, modify_order,
     get_active_trades, get_all_trades, refresh_live_pnl, refresh_order_statuses,
-    get_day_report, modify_kite_order, cancel_kite_order, exit_kite_position)
+    get_day_report, modify_kite_order, cancel_kite_order, exit_kite_position,
+    list_kite_gtts, place_kite_gtt_sl, modify_kite_gtt_sl, cancel_kite_gtt)
 from config import get_index_cfg, BUDGET_PER_LOT, MIN_CANDLES, SL_LIMIT_PCT, TRAILING_SL_PCT
 
 load_dotenv()
@@ -84,17 +86,63 @@ async def get_indicators():
 @app.get("/data/signal")
 async def get_signal(): return _build_signal()
 
+def _spot_ltp(candles):
+    """LTP for chain/options priming even before MIN_CANDLES have closed —
+    falls back to the still-forming candle's live close so the option chain
+    and sizing don't have to wait out the signal-engine warmup."""
+    r = compute_all(candles, vix=_vix_cache)
+    ltp = (r or {}).get("latest", {}).get("ltp", 0)
+    if ltp: return ltp
+    cur = get_current_candle()
+    return (cur or {}).get("close", 0) or 0
+
 @app.get("/data/options")
-async def get_options(budget:int=Query(default=None), index:str=Query(default=None)):
-    return get_affordable_options(_build_signal(), index or get_active_index(), budget or BUDGET_PER_LOT)
+async def get_options(budget:int=Query(default=None), index:str=Query(default=None), use_funds:bool=Query(default=False)):
+    return get_affordable_options(_build_signal(), index or get_active_index(), budget or BUDGET_PER_LOT, use_available_funds=use_funds)
+
+@app.get("/trade/best-option")
+async def best_option(index:str=Query(default=None)):
+    """Signal Module's 'Click to Trade' source: the best CE/PE for the
+    CURRENT signal direction, sized from live available Zerodha funds via
+    LTP <= available_funds/(lot_size*2), ranked by Black-Scholes delta/theta."""
+    sig = _build_signal()
+    result = get_affordable_options(sig, index or get_active_index(), use_available_funds=True)
+    return {**result, "signal": sig.get("signal"), "actionable": sig.get("actionable"),
+            "tier": sig.get("tier"), "prediction": sig.get("prediction")}
 
 @app.get("/data/oi-chain")
 async def oi_chain(range_pts:int=200, index:str=Query(default=None)):
     idx = index or get_active_index()
-    c   = get_candles()
-    ltp = (compute_all(c) or {}).get("latest",{}).get("ltp", 0)
+    ltp = _spot_ltp(get_candles())
     if not ltp: return {"chain":[],"message":"No LTP yet"}
     return {"chain":get_oi_chain(ltp, idx, range_pts),"ltp":ltp,"index":idx}
+
+# ── GTT stop-loss management (any position — bot-placed or manual) ───────────
+@app.get("/trade/gtts")
+async def gtts_list():
+    try: return {"gtts": list_kite_gtts()}
+    except Exception as e: return JSONResponse(400, {"error": str(e)})
+
+@app.post("/trade/gtt")
+async def gtt_create(body: dict):
+    try:
+        gid = place_kite_gtt_sl(body["exchange"], body["tradingsymbol"], body["qty"],
+            body["trigger_price"], body.get("limit_price"), body.get("last_price"), body.get("product"))
+        return {"status":"created","gtt_id":gid}
+    except Exception as e: return JSONResponse(400, {"error": str(e)})
+
+@app.put("/trade/gtt/{gtt_id}")
+async def gtt_modify(gtt_id: str, body: dict):
+    try:
+        r = modify_kite_gtt_sl(gtt_id, body["exchange"], body["tradingsymbol"], body["qty"],
+            body["trigger_price"], body.get("limit_price"), body.get("last_price"), body.get("product"))
+        return {"status":"modified","result":r}
+    except Exception as e: return JSONResponse(400, {"error": str(e)})
+
+@app.delete("/trade/gtt/{gtt_id}")
+async def gtt_cancel(gtt_id: str):
+    try: return {"status":"cancelled","result": cancel_kite_gtt(gtt_id)}
+    except Exception as e: return JSONResponse(400, {"error": str(e)})
 
 @app.get("/data/vix")
 async def vix_ep(): return {"vix":_vix_cache}
@@ -234,6 +282,14 @@ async def _broadcast(candle: dict):
     _fii_dii_cache = get_fii_dii()
     refresh_order_statuses()
     c    = get_candles(); ind = compute_all(c, vix=_vix_cache)
+    idx  = get_active_index()
+    ltp  = ind.get("latest", {}).get("ltp") or _spot_ltp(c)
+    if ltp:
+        try:
+            chain = get_oi_chain(ltp, idx, range_pts=300)
+            oi_tracker.record(idx, sum(r.get("ce_oi", 0) for r in chain), sum(r.get("pe_oi", 0) for r in chain))
+        except Exception as e:
+            print(f"[OITracker] {e}")
     sig  = _build_signal()
     live = refresh_live_pnl()
     total = round(sum(t.get("live_pnl") or 0 for t in live),2)
@@ -265,7 +321,8 @@ async def _fast_refresh_loop():
             ind = compute_all(merged, vix=_vix_cache)
             if not ind: continue
             sig = evaluate_signals(merged, vix=_vix_cache, vix_prev=_vix_prev,
-                                    fii_dii=_fii_dii_cache, index=get_active_index())
+                                    fii_dii=_fii_dii_cache, index=get_active_index(),
+                                    advance_history=False)
             payload = json.dumps({"partial":True,"candle":cur,"signal":sig,
                 "indicators":ind.get("latest",{}),"fibonacci":ind.get("fibonacci",{}),
                 "trend":ind.get("trend",{}),"index":get_active_index(),

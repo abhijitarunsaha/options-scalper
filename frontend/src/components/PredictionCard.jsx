@@ -32,14 +32,14 @@ export default function PredictionCard({ prediction }) {
           <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
             {target != null && (
               <div style={{ background: "var(--bg4)", border: `1px solid ${color}33`, borderRadius: 8, padding: "6px 12px" }}>
-                <div style={{ fontSize: 9, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".06em" }}>Projected touch</div>
-                <div style={{ fontFamily: T.mono, fontWeight: 600, fontSize: 13, color }}>₹{target}</div>
+                <div style={{ fontSize: 9, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".06em" }}>Projected touch (index)</div>
+                <div style={{ fontFamily: T.mono, fontWeight: 600, fontSize: 13, color }}>{target.toLocaleString("en-IN")}</div>
               </div>
             )}
             {invalidation != null && (
               <div style={{ background: "var(--bg4)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px" }}>
-                <div style={{ fontSize: 9, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".06em" }}>Invalidation</div>
-                <div style={{ fontFamily: T.mono, fontWeight: 600, fontSize: 13, color: "var(--text2)" }}>₹{invalidation}</div>
+                <div style={{ fontSize: 9, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".06em" }}>Invalidation (index)</div>
+                <div style={{ fontFamily: T.mono, fontWeight: 600, fontSize: 13, color: "var(--text2)" }}>{invalidation.toLocaleString("en-IN")}</div>
               </div>
             )}
             {!mtf_aligned && (
@@ -60,7 +60,7 @@ export default function PredictionCard({ prediction }) {
           </div>
         )}
         <div style={{ fontSize: 9.5, color: "var(--muted)", marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
-          Rule-based read from current chart structure, not a backtested model — treat as a second opinion, not a call.
+          Structured multi-factor read (trend, BB, RSI divergence, OI momentum, VIX, 5-min confluence, S/R target room) — not a trained/backtested ML model. Validate against history with backend/backtest.py before trusting it as more than a second opinion.
         </div>
       </div>
     </div>

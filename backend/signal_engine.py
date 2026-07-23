@@ -7,34 +7,44 @@ CRITICAL FIX vs legacy dashboard:
   a live trending move — causing missed opportunities.
 
 NEW APPROACH — 3 signal tiers:
-  STRONG  (7+/12): full confirmation, all groups align
-  MODERATE(5-6/12): good trend + some structure
-  SCOUT   (3-4/12): pure trend-following, fires ONLY when market is in
+  STRONG  (7+/13): full confirmation, all groups align
+  MODERATE(5-6/13): good trend + some structure
+  SCOUT   (3-4/13): pure trend-following, fires ONLY when market is in
                     confirmed BULLISH_TREND or BEARISH_TREND
 
   In a trending market SCOUT fires immediately when 3 trend/momentum
   conditions align — so the alert comes at the START of the move,
   not after it has already run.
 
-12 conditions across 6 groups:
-  A. Trend (3):    VWAP, EMA9>21, MACD hist
-  B. Momentum (1): RSI range + slope
-  C. Structure (3):Fib zone, BB band, swing breakout/breakdown
-  D. Volume (1):   Spike ≥ 1.5× avg
+13 conditions across 7 groups:
+  A. Trend (3):     VWAP, EMA9>21, MACD hist
+  B. Momentum (2):  RSI range + slope, RSI divergence
+  C. Structure (3): Fib zone, BB outer band, swing breakout/breakdown
+  D. Volume (1):    Spike >= 1.5x avg
   E. Price Action(1): engulfing / hammer / 3-bar pattern
-  F. Context (3):  OI/PCR, VIX, FII/DII bias + target gap
+  F. OI/Context (2): 15-min OI momentum, VIX
+  G. Target room (1): projected move clears MIN_INDEX_TARGET_POINTS
+
+ANTI-OVERTRADING — an "actionable" fire now additionally requires the
+near-term predictor (trend_predictor.py) to have a target at least
+MIN_INDEX_TARGET_POINTS away in the signal's direction. A signal can score
+high on the checklist above and still stay "forming" if there's no room for
+the index to actually move — this is the direct fix for signals firing with
+a 2-5pt target that no realistic option trade could profit from.
 """
 from collections import deque
 from datetime import datetime, timedelta
 import pytz
 from indicators import compute_all
 from trend_predictor import predict as predict_trend
+import oi_tracker
 from config import (
     MIN_CANDLES,
     SIGNAL_THRESHOLD_STRONG, SIGNAL_THRESHOLD_MODERATE, SIGNAL_THRESHOLD_SCOUT,
     SIGNAL_START_H, SIGNAL_START_M, SIGNAL_END_H, SIGNAL_END_M,
-    MIN_TARGET_GAP, TAKE_PROFIT_PCT,
+    MIN_TARGET_GAP, MIN_INDEX_TARGET_POINTS, TAKE_PROFIT_PCT,
     CONFIRM_BARS, COOLDOWN_MINUTES, GLOBAL_COOLDOWN_MINUTES, MIN_MOVE_ATR_MULT,
+    OI_MOMENTUM_SHORT_MIN, OI_MOMENTUM_LONG_MIN,
 )
 
 IST = pytz.timezone("Asia/Kolkata")
@@ -62,7 +72,7 @@ def _get_state(index: str) -> dict:
     })
 
 
-def _confirm(index: str, regime_mode: str, direction: str, tier: str, ltp: float, atr: float) -> tuple[bool, str]:
+def _confirm(index: str, regime_mode: str, direction: str, tier: str, ltp: float, atr: float, advance_history: bool) -> tuple[bool, str]:
     """
     Two independent gates before a signal is marked actionable:
       1. Regime-appropriate persistence (skipped for OR/compression fast lanes,
@@ -70,13 +80,24 @@ def _confirm(index: str, regime_mode: str, direction: str, tier: str, ltp: float
       2. A GLOBAL guard across BOTH directions: even a persistent, regime-eligible
          signal only fires if enough time has passed OR price has actually moved
          (>= MIN_MOVE_ATR_MULT × ATR) since the last actionable fire of ANY
-         direction — unless this one is STRONG tier and the last wasn't. This is
-         what stops a CE signal at 10:37 and a PE signal at 10:39 both firing:
-         two minutes and a few points of chop is not a tradeable reversal.
+         direction — unless this one is STRONG tier, the last wasn't, AND price
+         has still moved at least half that threshold (a tier bump alone is no
+         longer enough to bypass the cooldown outright).
+    A third gate (target-room, based on the near-term predictor) is applied by
+    the caller in _make(), since it needs the prediction dict computed there.
+
+    advance_history: only True for real, once-per-minute closed-candle
+    evaluations (main.py's _broadcast). The fast-refresh loop (main.py, every
+    5-10s) calls this with False — it can still report the CURRENT persistence
+    state, but must not push a new bar into the CONFIRM_BARS deque or update
+    cooldown timers, or a signal that only lasted a few seconds intraminute
+    could satisfy a "5 consecutive bars" requirement in 5-10 real seconds.
     """
     st = _get_state(index)
-    st["history"].append(direction)
     now = datetime.now(IST)
+
+    if advance_history:
+        st["history"].append(direction)
 
     if regime_mode == "STEADY_STATE":
         recent = list(st["history"])[-CONFIRM_BARS:]
@@ -93,9 +114,10 @@ def _confirm(index: str, regime_mode: str, direction: str, tier: str, ltp: float
     else:
         elapsed  = now - last_any["time"]
         cooled   = elapsed >= timedelta(minutes=GLOBAL_COOLDOWN_MINUTES)
-        moved    = bool(atr) and abs((ltp or 0) - (last_any.get("ltp") or 0)) >= MIN_MOVE_ATR_MULT * atr
-        override = tier == "STRONG" and last_any.get("tier") != "STRONG"
-        global_cleared = cooled or moved or override
+        moved_full = bool(atr) and abs((ltp or 0) - (last_any.get("ltp") or 0)) >= MIN_MOVE_ATR_MULT * atr
+        moved_half = bool(atr) and abs((ltp or 0) - (last_any.get("ltp") or 0)) >= 0.5 * MIN_MOVE_ATR_MULT * atr
+        override = tier == "STRONG" and last_any.get("tier") != "STRONG" and moved_half
+        global_cleared = cooled or moved_full or override
         if not global_cleared:
             left = GLOBAL_COOLDOWN_MINUTES - int(elapsed.total_seconds() // 60)
             why = (f"Cooldown active (~{max(left,0)}m) — price hasn't moved enough since the "
@@ -104,8 +126,9 @@ def _confirm(index: str, regime_mode: str, direction: str, tier: str, ltp: float
     if not global_cleared:
         return False, why
 
-    st["last_actionable"][direction] = now
-    st["last_actionable_any"] = {"time": now, "direction": direction, "tier": tier, "ltp": ltp}
+    if advance_history:
+        st["last_actionable"][direction] = now
+        st["last_actionable_any"] = {"time": now, "direction": direction, "tier": tier, "ltp": ltp}
     label = {"OPENING_RANGE": "Opening-range fast lane", "COMPRESSION": "Compression breakout"}.get(regime_mode)
     reason = f"{label} — immediate entry" if label else f"Confirmed {CONFIRM_BARS} consecutive bars, move validated"
     return True, reason
@@ -118,15 +141,16 @@ def evaluate_signals(
     vix_prev: float | None = None,
     fii_dii:  dict | None = None,
     index:    str = "DEFAULT",
+    advance_history: bool = True,
 ) -> dict:
     """
     Returns:
       { signal: "CE_BUY"|"PE_BUY"|"WAIT",
         tier:   "STRONG"|"MODERATE"|"SCOUT"|"OR_BREAKOUT"|None,
-        score:  int,  total: 12,
+        score:  int,  total: 13,
         conditions: [...],
         trend:  str,
-        actionable: bool,       # False = still forming / on cooldown, don't re-prompt
+        actionable: bool,       # False = still forming / on cooldown / no target room
         confirm_reason: str,
         regime: "OPENING_RANGE"|"COMPRESSION"|"STEADY_STATE",
         ... }
@@ -154,7 +178,9 @@ def evaluate_signals(
     trend   = trn["trend"]
     regime  = data["regime"]
     mode    = regime["mode"]
-    prediction = predict_trend(candles, data)
+
+    oi_mom = oi_tracker.momentum(index, OI_MOMENTUM_SHORT_MIN, OI_MOMENTUM_LONG_MIN)
+    prediction = predict_trend(candles, data, oi_momentum=oi_mom, index=index)
 
     ltp         = L["ltp"]
     rsi         = L["rsi"]
@@ -172,14 +198,14 @@ def evaluate_signals(
     supports     = [fib["38.2"], fib["50.0"]]
     resistances  = [fib["61.8"], fib["78.6"]]
 
-    pcr          = (oi_data or {}).get("pcr", 1.0)
-    ce_oi_chg    = (oi_data or {}).get("ce_oi_change", 0)
-    pe_oi_chg    = (oi_data or {}).get("pe_oi_change", 0)
+    # oi_data (per-strike chain snapshot) still informs the day's cumulative PCR;
+    # oi_mom (oi_tracker) is the actual 5/15-min momentum read.
+    pcr          = oi_mom.get("pcr") or (oi_data or {}).get("pcr", 1.0)
     vix_val      = vix or 15.0
     vix_rising   = vix is not None and vix_prev is not None and vix > vix_prev
     fd_bias      = (fii_dii or {}).get("bias", "NEUTRAL")
-    approx_tp    = 0.5 * 2 * atr * (TAKE_PROFIT_PCT / 100)
-    tgt_ok       = approx_tp >= MIN_TARGET_GAP
+
+    div = prediction.get("rsi_divergence") or {"bullish": False, "bearish": False}
 
     conds = []
     def c(lce, lpe, ce_m, pe_m):
@@ -201,6 +227,8 @@ def evaluate_signals(
       f"RSI {rsi:.1f} in 45-65 & falling",
       35 <= rsi <= 55 and rsi_slope > 0,
       45 <= rsi <= 65 and rsi_slope < 0)
+    c("Bullish RSI divergence", "Bearish RSI divergence",
+      div.get("bullish"), div.get("bearish"))
 
     # ── C: Structure ──────────────────────────────────────────────────────────
     c("Near Fib 38.2%/50% support",
@@ -228,22 +256,26 @@ def evaluate_signals(
       "Bearish candle pattern",
       bull_pa, bear_pa)
 
-    # ── F: Market Context ─────────────────────────────────────────────────────
-    c(f"CE OI rising / PCR {pcr:.2f} < 0.8",
-      f"PE OI rising / PCR {pcr:.2f} > 1.2",
-      ce_oi_chg > 0 or pcr < 0.8,
-      pe_oi_chg > 0 or pcr > 1.2)
+    # ── F: OI momentum + VIX ───────────────────────────────────────────────────
+    c(f"OI(15m): PE building > CE, PCR {pcr:.2f}",
+      f"OI(15m): CE building > PE, PCR {pcr:.2f}",
+      oi_mom.get("bias") == "BULLISH" or pcr < 0.8,
+      oi_mom.get("bias") == "BEARISH" or pcr > 1.2)
     c(f"VIX {vix_val:.1f} ≤ 20",
       f"VIX {vix_val:.1f} ≥ 18 or rising",
       vix_val <= 20,
       vix_val >= 18 or vix_rising)
-    c(f"FII/DII: {fd_bias}",
-      f"FII/DII: {fd_bias}",
-      fd_bias in ("BULLISH", "MIXED"),
-      fd_bias in ("BEARISH", "MIXED"))
-    c(f"Est. target ≥ ₹{MIN_TARGET_GAP:.0f} (≈₹{approx_tp:.1f})",
-      f"Est. target ≥ ₹{MIN_TARGET_GAP:.0f} (≈₹{approx_tp:.1f})",
-      tgt_ok, tgt_ok)
+
+    # ── G: Target room ─────────────────────────────────────────────────────────
+    # Uses the predictor's own gated ladder (already >= MIN_INDEX_TARGET_POINTS
+    # away) rather than a flat ATR formula — so this reflects a real level, not
+    # just "the index is volatile enough in the abstract."
+    ladder = prediction.get("sr_ladder") or {"above": [], "below": []}
+    tgt_room_ce = bool(ladder.get("above"))
+    tgt_room_pe = bool(ladder.get("below"))
+    c(f"Room to run ≥{MIN_INDEX_TARGET_POINTS:.0f}pts (next level above)",
+      f"Room to run ≥{MIN_INDEX_TARGET_POINTS:.0f}pts (next level below)",
+      tgt_room_ce, tgt_room_pe)
 
     sce = sum(1 for x in conds if x["ce"])
     spe = sum(1 for x in conds if x["pe"])
@@ -259,7 +291,18 @@ def evaluate_signals(
     trend_score_pe = sum(1 for x in conds[:4] if x["pe"])
 
     def _make(direction, score, tier, reasons):
-        actionable, confirm_reason = _confirm(index, mode, direction, tier, ltp, atr)
+        actionable, confirm_reason = _confirm(index, mode, direction, tier, ltp, atr, advance_history)
+
+        # Extra gate: even a persistent, cooled-down signal doesn't count as
+        # actionable unless the predictor sees room to run in this direction —
+        # this is what stops a 2-5pt "target" from ever reaching the UI as a
+        # tradeable alert.
+        if actionable:
+            has_room = tgt_room_ce if direction == "CE_BUY" else tgt_room_pe
+            if not has_room:
+                actionable = False
+                confirm_reason = f"No level ≥{MIN_INDEX_TARGET_POINTS:.0f}pts away in this direction yet — waiting for room to run"
+
         return {
             "signal":     direction,
             "tier":       tier,
@@ -272,6 +315,7 @@ def evaluate_signals(
             "trend": trend, "ema_slope": trn["ema_slope"],
             "fibonacci": fib,
             "fii_dii": fii_dii or {},
+            "oi_momentum": oi_mom,
             "candle_count": len(candles),
             "actionable": actionable, "confirm_reason": confirm_reason,
             "regime": mode, "regime_detail": regime,
@@ -293,13 +337,13 @@ def evaluate_signals(
             return _make("PE_BUY", trend_score_pe, "OR_BREAKOUT",
                          [f"Opening-range breakdown below {or_low:.0f}"])
 
-    # STRONG (7+/12, any trend)
+    # STRONG (7+/13, any trend)
     if sce >= SIGNAL_THRESHOLD_STRONG and sce >= spe:
         return _make("CE_BUY", sce, "STRONG", [x["label_ce"] for x in conds if x["ce"]])
     if spe >= SIGNAL_THRESHOLD_STRONG:
         return _make("PE_BUY", spe, "STRONG", [x["label_pe"] for x in conds if x["pe"]])
 
-    # MODERATE (5-6/12, any trend)
+    # MODERATE (5-6/13, any trend)
     if sce >= SIGNAL_THRESHOLD_MODERATE and sce >= spe:
         return _make("CE_BUY", sce, "MODERATE", [x["label_ce"] for x in conds if x["ce"]])
     if spe >= SIGNAL_THRESHOLD_MODERATE:
@@ -319,6 +363,7 @@ def evaluate_signals(
         "conditions": conds,
         "ltp": ltp, "vwap": vwap, "rsi": rsi, "atr": atr,
         "trend": trend, "ema_slope": trn["ema_slope"],
+        "oi_momentum": oi_mom,
         "candle_count": len(candles),
         "actionable": False, "regime": mode, "regime_detail": regime,
         "prediction": prediction,

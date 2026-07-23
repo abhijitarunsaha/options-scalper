@@ -131,6 +131,17 @@ def get_holdings_snapshot(force: bool = False) -> dict:
     return data
 
 
+def get_available_funds() -> float:
+    """Live Zerodha equity available balance — used by option_filter's
+    fund-based sizing (LTP <= available_funds / (lot_size * 2))."""
+    try:
+        m = get_kite().margins()
+        return float(((m.get("equity", {}) or {}).get("available", {}) or {}).get("live_balance", 0) or 0)
+    except Exception as e:
+        print(f"[Portfolio] get_available_funds: {e}")
+        return 0.0
+
+
 def get_exposure_factor() -> dict:
     """Margin-utilization read -> lot-size multiplier for the scalper's sizing."""
     try:

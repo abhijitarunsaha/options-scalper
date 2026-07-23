@@ -4,10 +4,10 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Sigmatics</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23171310'/%3E%3Cpath d='M15 18h34l-15 14 15 14H15l13-14z' fill='none' stroke='%233F5FE0' stroke-width='4' stroke-linejoin='round' stroke-linecap='round'/%3E%3Ccircle cx='47' cy='18' r='3.2' fill='%231FAE72'/%3E%3C/svg%3E"/>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='10' y1='10' x2='90' y2='90' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%23D4AF37'/%3E%3Cstop offset='1' stop-color='%23B8860B'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='22' fill='%230D0B08'/%3E%3Ccircle cx='50' cy='50' r='36' stroke='url(%23g)' stroke-width='5'/%3E%3Cpath d='M39 34h22l-13 16 13 16H39' stroke='url(%23g)' stroke-width='5.5' stroke-linejoin='round' stroke-linecap='round' fill='none'/%3E%3Cpath d='M22 66 L36 50 L46 56 L62 32 L80 20' stroke='%2300E67E' stroke-width='6' stroke-linejoin='round' stroke-linecap='round' fill='none'/%3E%3C/svg%3E"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     :root{
@@ -19,22 +19,23 @@
       --shadow:0 4px 20px rgba(0,0,0,0.35);--shadow2:0 12px 36px rgba(0,0,0,0.45);
       --radius:10px;--radius2:14px;--radius3:20px;
 
-      /* brand + domain accents — cobalt brand, emerald/rose/marigold CE/PE/watch */
-      --brand:#3F5FE0;--brandDim:rgba(63,95,224,0.16);--brandGlow:rgba(63,95,224,0.35);
-      --accent:#3F5FE0;--accent2:#8B6CF0;--accent3:#1FAE72;
-      --bull:#1FAE72;--bullDim:rgba(31,174,114,0.15);--bullGlow:rgba(31,174,114,0.35);
+      /* brand + domain accents — gold/bronze identity, emerald CE/bull, accent-blue brand */
+      --brand:#2962FF;--brandDim:rgba(41,98,255,0.16);--brandGlow:rgba(41,98,255,0.35);
+      --accent:#2962FF;--accent2:#8B6CF0;--accent3:#00E67E;
+      --bull:#00E67E;--bullDim:rgba(0,230,126,0.15);--bullGlow:rgba(0,230,126,0.35);
       --bear:#E1476B;--bearDim:rgba(225,71,107,0.15);--bearGlow:rgba(225,71,107,0.35);
-      --watch:#E0A02E;--watchDim:rgba(224,160,46,0.15);--watchGlow:rgba(224,160,46,0.35);
+      --watch:#D4AF37;--watchDim:rgba(212,175,55,0.15);--watchGlow:rgba(212,175,55,0.35);
+      --bronze:#B8860B;
       /* legacy aliases used across existing components */
       --green:var(--bull);--greenDim:var(--bullDim);--greenGlow:var(--bullGlow);
       --red:var(--bear);--redDim:var(--bearDim);--redGlow:var(--bearGlow);
       --gold:var(--watch);--goldDim:var(--watchDim);
       --blue:var(--brand);--blueDim:var(--brandDim);
       --glass:var(--panel);--glass2:var(--panel2);
-      /* named aliases matching the brief's palette language */
+      /* named aliases matching the brand sheet's palette language */
       --emerald:var(--bull);--rose:var(--bear);--marigold:var(--watch);--cobalt:var(--brand);
 
-      --font-display:'Space Grotesk',sans-serif;--font-body:'Inter',sans-serif;--mono:'IBM Plex Mono',monospace;
+      --font-display:'Orbitron',sans-serif;--font-body:'Inter',sans-serif;--mono:'JetBrains Mono',monospace;
     }
     body.light-mode{
       /* Warm Ink — light mode: warm ivory paper, not stark white */
@@ -43,14 +44,14 @@
       --border:rgba(38,30,16,0.09);--border2:rgba(38,30,16,0.15);
       --text:#221B10;--text2:#5C5340;--muted:#8C8168;--muted2:#EAE0C8;
       --shadow:0 4px 20px rgba(40,30,10,0.07);--shadow2:0 12px 32px rgba(40,30,10,0.11);
-      --brand:#2E4BC6;--accent:#2E4BC6;--accent2:#6E4FCB;--accent3:#188A5C;
-      --bull:#188A5C;--bullDim:rgba(24,138,92,0.12);
+      --brand:#2151CC;--accent:#2151CC;--accent2:#6E4FCB;--accent3:#0FA968;
+      --bull:#0FA968;--bullDim:rgba(15,169,104,0.12);
       --bear:#C13A5B;--bearDim:rgba(193,58,91,0.12);
-      --watch:#B5791E;--watchDim:rgba(181,121,30,0.12);
+      --watch:#A9791E;--watchDim:rgba(169,121,30,0.12);--bronze:#8C6208;
       --green:var(--bull);--greenDim:var(--bullDim);
       --red:var(--bear);--redDim:var(--bearDim);
       --gold:var(--watch);--goldDim:var(--watchDim);
-      --blue:var(--brand);--blueDim:rgba(46,75,198,0.10);
+      --blue:var(--brand);--blueDim:rgba(33,81,204,0.10);
       --glass:var(--panel);--glass2:var(--panel2);
       --emerald:var(--bull);--rose:var(--bear);--marigold:var(--watch);--cobalt:var(--brand);
     }

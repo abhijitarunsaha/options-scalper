@@ -47,25 +47,39 @@ MARKET_CLOSE_H, MARKET_CLOSE_M = _hm("MARKET_CLOSE", "15:30")
 #                same direction + COOLDOWN_MINUTES since the last actionable fire in
 #                that direction, so a single ongoing move doesn't retrigger every bar.
 OPENING_RANGE_END_H, OPENING_RANGE_END_M = _hm("OPENING_RANGE_END", "09:30")
-CONFIRM_BARS              = int(os.environ.get("CONFIRM_BARS", 3))
-COOLDOWN_MINUTES          = int(os.environ.get("COOLDOWN_MINUTES", 4))
+CONFIRM_BARS              = int(os.environ.get("CONFIRM_BARS", 5))
+COOLDOWN_MINUTES          = int(os.environ.get("COOLDOWN_MINUTES", 6))
 # GLOBAL_COOLDOWN / MIN_MOVE_ATR_MULT: cross-direction guard. Even a persistent,
 # regime-eligible signal only fires if GLOBAL_COOLDOWN_MINUTES have passed OR the
 # index has moved >= MIN_MOVE_ATR_MULT x ATR since the last actionable fire in
 # EITHER direction (a same-tier STRONG signal can override the cooldown). This is
 # what stops a CE signal and a PE signal firing 2 minutes apart on ordinary chop.
-GLOBAL_COOLDOWN_MINUTES   = int(os.environ.get("GLOBAL_COOLDOWN_MINUTES", 6))
-MIN_MOVE_ATR_MULT         = float(os.environ.get("MIN_MOVE_ATR_MULT", 0.6))
+GLOBAL_COOLDOWN_MINUTES   = int(os.environ.get("GLOBAL_COOLDOWN_MINUTES", 10))
+MIN_MOVE_ATR_MULT         = float(os.environ.get("MIN_MOVE_ATR_MULT", 1.2))
 COMPRESSION_BB_WIDTH_DROP = float(os.environ.get("COMPRESSION_BB_WIDTH_DROP", 0.15))
 COMPRESSION_ATR_DROP      = float(os.environ.get("COMPRESSION_ATR_DROP", 0.10))
 TREND_LOOKBACK_BARS       = int(os.environ.get("TREND_LOOKBACK_BARS", 20))  # ~20-30 min on 1-min candles
+
+# Minimum index-point distance a projected target must clear before a signal
+# counts as actionable / before the S/R ladder will use a level as a target.
+# This is the direct fix for signals firing with only a 2-5pt "target" —
+# too close to be a real trade, just noise around the current price.
+MIN_INDEX_TARGET_POINTS   = float(os.environ.get("MIN_INDEX_TARGET_POINTS", 20))
 
 BUDGET_PER_LOT  = int(os.environ.get("BUDGET_PER_LOT",  2500))
 SL_LIMIT_PCT    = float(os.environ.get("SL_LIMIT_PCT",   20))
 TRAILING_SL_PCT = float(os.environ.get("TRAILING_SL_PCT", 5))
 TAKE_PROFIT_PCT = float(os.environ.get("TAKE_PROFIT_PCT", 95))
-MIN_TARGET_GAP  = float(os.environ.get("MIN_TARGET_GAP",   5))
+MIN_TARGET_GAP  = float(os.environ.get("MIN_TARGET_GAP",   8))
 
 TREND_EMA_FAST = int(os.environ.get("TREND_EMA_FAST",  9))
 TREND_EMA_SLOW = int(os.environ.get("TREND_EMA_SLOW", 21))
 TREND_EMA_LONG = int(os.environ.get("TREND_EMA_LONG", 50))
+
+# ── Options greeks + monthly S/R (used by option_filter.py / trend_predictor.py) ──
+RISK_FREE_RATE       = float(os.environ.get("RISK_FREE_RATE", 0.068))  # ~India T-bill
+MONTHLY_LOOKBACK_DAYS = int(os.environ.get("MONTHLY_LOOKBACK_DAYS", 35))
+# OI momentum sampling window (main.py's oi_tracker records one snapshot per
+# closed 1-min candle, so these are in *snapshots*, i.e. minutes)
+OI_MOMENTUM_SHORT_MIN = int(os.environ.get("OI_MOMENTUM_SHORT_MIN", 5))
+OI_MOMENTUM_LONG_MIN  = int(os.environ.get("OI_MOMENTUM_LONG_MIN", 15))

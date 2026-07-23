@@ -103,3 +103,114 @@ rendered raw) and replaced with OIChain (option chain) in the sidebar.
   indicators but does NOT append it to candle history (only real 1-min closes
   do that). GET/POST /data/refresh-interval (5/10/15/30/60) controls the
   cadence; SignalCard.jsx exposes a 5s/10s selector in its header.
+
+## Brand + dashboard finalization (July 2026, follow-up)
+- Logo finalized to the brand sheet: gold-ring sigma mark crossed by an
+  emerald rising-line accent (Logo.jsx exports LogoMark, LogoCompact, and the
+  full lockup with the "SIGNALS, QUANTIFIED" tagline). Palette tightened to
+  the sheet's exact hex values (gold #D4AF37, bronze #B8860B, emerald
+  #00E67E, accent blue #2962FF) in index.html; fonts moved to Orbitron
+  (display) + Inter (body) + JetBrains Mono (numbers), replacing Space
+  Grotesk/IBM Plex Mono.
+- Dashboard restructured to mirror the reference layout: row 1 is
+  SignalModuleCard (the big regime ring + entry/target/stop) next to
+  ChartCard (candle chart with an OHLC toolbar + an Indicators on/off
+  toggle — CandleChart's new `showOverlays` prop). Row 2 is OIChain
+  (now tabbed Option Chain / Active Chain, columns reordered to
+  OI/LTP/CHG per side to match) next to PositionsHoldingsCard (compact
+  Positions/Holdings tabs with a "View All Positions" expander that reveals
+  the full TradeBox for modify/cancel/exit). Everything from the previous
+  redesign (KPI row, SignalCard w/ pattern-refresh selector, PredictionCard,
+  RecommendPanel, DayPnlDoughnut, FibLegend, SignalLog) is kept below those
+  two rows rather than removed — the reference image only showed the
+  above-the-fold layout, not a request to drop functionality.
+- TopBar rebuilt: hamburger menu holds the Dashboard/Portfolio/Reports nav
+  (was inline tabs before), index switching is now a ticker strip (only the
+  active index shows live price + intraday %, since the backend only
+  streams one index at a time), plus a market-hours pill (computed from IST
+  clock, not fetched), a signal-alert bell badge, and a decorative account
+  avatar (no real user/profile system exists to wire it to).
+
+## Prediction-engine rework + dashboard fixes (July 2026, priority follow-up)
+**Root causes of the reported overtrading (4 signals/2min, 2-5pt targets):**
+config.py had MIN_TARGET_GAP=5 (₹5 premium gap) and trend_predictor's S/R ladder
+would happily project a target off a noise-level micro-pivot only 2-5 index
+points away; CONFIRM_BARS=3 / GLOBAL_COOLDOWN_MINUTES=6 / MIN_MOVE_ATR_MULT=0.6
+were all too loose; oi_data was NEVER actually populated (main.py never passed
+it into evaluate_signals), so the OI/PCR condition was silently dead; and — the
+subtlest bug — the new `_fast_refresh_loop` (added in the prior redesign
+session, runs every 5-10s) was calling evaluate_signals() the same as the real
+once-a-minute broadcast, so it was advancing the CONFIRM_BARS persistence
+counter 6-12x faster than a bar-based counter should. Fixed via
+`advance_history` param threaded through evaluate_signals()/_confirm() —
+only main.py's real per-candle `_broadcast` passes advance_history=True now;
+the fast-refresh loop passes False so it can still update the live checklist
+without falsely satisfying persistence on sub-minute noise.
+
+**New backend modules:** greeks.py (Black-Scholes delta/gamma/theta/vega +
+IV backed out from each option's own premium via bisection — replaces the old
+linear "0.5 - steps*0.08" delta guess), oi_tracker.py (rolling 5/15-min
+aggregate CE/PE OI snapshots, sampled once per closed candle in
+main.py's _broadcast — this is what actually feeds "OI change over 5-15 min"
+now), monthly_levels.py (1-month daily-candle S/R via kite.historical_data,
+cached 4h, merged into trend_predictor's intraday pivot ladder),
+backtest.py (historical validation harness — replays evaluate_signals() over
+N days of 1-min history and reports signals/day + hit rate by tier; NOT run
+in this build environment — no network access to Zerodha's API here — the
+user needs to run `python backtest.py --index NIFTY --days 90` themselves
+with a live Kite session to actually validate/tune the new thresholds).
+
+**trend_predictor.py** rewritten: bias score now combines EMA trend + BB
+outer/mid position + RSI divergence + oi_tracker's 15-min OI bias + VIX
+level/trend discount + 5-min timeframe confluence (sharply discounts when
+5-min disagrees with 1-min). Target/invalidation come from the merged
+intraday+monthly S/R ladder, gated to MIN_INDEX_TARGET_POINTS (config,
+default 20) away — this is the direct fix for a 2-5pt "target". If no level
+clears that bar, target stays None rather than picking a near one.
+
+**signal_engine.py** now has 13 conditions (was 12, effectively fewer since
+OI was dead) across trend/momentum/structure/volume/price-action/OI+VIX/
+target-room groups, and an actionable fire additionally requires the
+predictor to see room to run in that direction (tgt_room_ce/tgt_room_pe from
+the gated ladder) — a signal can score well on the checklist and still show
+as "Building" if there's no clean target.
+
+**option_filter.get_affordable_options** gained `use_available_funds=True`
+mode: sizes via `available_funds / (lot_size * 2)` (portfolio.py's new
+get_available_funds(), from kite.margins()) per the user's exact formula,
+and ranks candidates by delta-fit (prefers |delta|~0.45) + liquidity - theta
+decay, using the real Black-Scholes greeks above. New endpoint
+GET /trade/best-option is what SignalModuleCard's "Click to Trade" and the
+Signal Log's per-entry trade button call.
+
+**GTT stop-loss UI:** trade_manager.py gained generic
+list_kite_gtts/place_kite_gtt_sl/modify_kite_gtt_sl/cancel_kite_gtt (work on
+ANY position — bot or manual — unlike the older _execute_sl/_update_gtt
+which only manage a bot trade's own GTT). Endpoints: GET/POST /trade/gtt(s),
+PUT and DELETE /trade/gtt/{gtt_id}. UI lives in the new shared
+TodaysPositions.jsx (extracted from PnLReport.jsx so both the Reports tab
+and PositionsHoldingsCard's "View All Positions" expander use the same
+component — this also fixed the bug where "View All Positions" only showed
+bot-tracked trades from /trade/refresh and missed manually-placed Zerodha
+positions; it now sources from /trade/day-report like Reports/the doughnut
+already did).
+
+**Dashboard fixes:** OIChain no longer refetches on every live-price tick
+(was the cause of the "flickers every second" report — `load` depended on
+`ltp`, which changes on every WS tick); now polls on a fixed 10s interval and
+merges new values into existing rows by strike instead of replacing the
+array, and fires immediately on mount without waiting for `ltp` truthy (the
+backend's /data/oi-chain now falls back to the in-progress candle's live
+close via main.py's `_spot_ltp()` when the 10-candle warmup hasn't finished,
+so the chain — and PositionsHoldingsCard's holdings preload on mount — no
+longer wait on signal-engine warmup). The day P&L doughnut moved from its
+own card further down the page into PositionsHoldingsCard, beside the
+Positions list. ConfirmationRing.jsx had a latent bug where the ring radius
+was hardcoded to r=26 regardless of the `size` prop — harmless at the
+original default size=64, but meant the new big Signal Module ring (size=148)
+and the small Signal Log rings (size=30) were rendering wrong; fixed to scale
+radius/stroke with size.
+
+**SignalModuleCard / PredictionCard:** dropped the "₹" prefix from
+Entry/Target/Stop and the near-term read's target/invalidation — these are
+NIFTY/BANKNIFTY/SENSEX index points, not rupee amounts.

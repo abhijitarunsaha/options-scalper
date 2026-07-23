@@ -2,8 +2,8 @@ import React, { useEffect, useRef } from "react";
 import { createChart, CrosshairMode, LineStyle } from "lightweight-charts";
 
 const FIB_COLORS = {
-  "0":"#7A7061","23.6":"#8A7F69","38.2":"#E0A02E",
-  "50.0":"#B4A890","61.8":"#E0A02E","78.6":"#8A7F69","100":"#7A7061"
+  "0":"#7A7061","23.6":"#8A7F69","38.2":"#D4AF37",
+  "50.0":"#B4A890","61.8":"#D4AF37","78.6":"#8A7F69","100":"#7A7061"
 };
 
 // IST offset: UTC+5:30 = 19800 seconds
@@ -31,7 +31,7 @@ function formatISTDate(unixSec) {
   });
 }
 
-export default function CandleChart({ candles, fibonacci }) {
+export default function CandleChart({ candles, fibonacci, showOverlays = true }) {
   const ref       = useRef(null);
   const chart     = useRef(null);
   const series    = useRef({});
@@ -80,15 +80,15 @@ export default function CandleChart({ candles, fibonacci }) {
     chart.current = c;
 
     series.current.candle = c.addCandlestickSeries({
-      upColor: "#1FAE72", downColor: "#E1476B",
-      borderUpColor: "#1FAE72", borderDownColor: "#E1476B",
-      wickUpColor: "#1FAE72", wickDownColor: "#E1476B",
+      upColor: "#00E67E", downColor: "#E1476B",
+      borderUpColor: "#00E67E", borderDownColor: "#E1476B",
+      wickUpColor: "#00E67E", wickDownColor: "#E1476B",
     });
     series.current.bbUpper = c.addLineSeries({ color: "rgba(124,111,247,0.5)", lineWidth: 1, lineStyle: LineStyle.Dashed, title: "BB↑" });
     series.current.bbMid   = c.addLineSeries({ color: "rgba(124,111,247,0.25)", lineWidth: 1, lineStyle: LineStyle.Dotted, title: "BB" });
     series.current.bbLower = c.addLineSeries({ color: "rgba(124,111,247,0.5)", lineWidth: 1, lineStyle: LineStyle.Dashed, title: "BB↓" });
-    series.current.ema9    = c.addLineSeries({ color: "#3F5FE0", lineWidth: 1.5, title: "EMA9" });
-    series.current.ema21   = c.addLineSeries({ color: "#E0A02E", lineWidth: 1.5, title: "EMA21" });
+    series.current.ema9    = c.addLineSeries({ color: "#2962FF", lineWidth: 1.5, title: "EMA9" });
+    series.current.ema21   = c.addLineSeries({ color: "#D4AF37", lineWidth: 1.5, title: "EMA21" });
     series.current.vwap    = c.addLineSeries({ color: "rgba(255,255,255,0.45)", lineWidth: 1, lineStyle: LineStyle.Dashed, title: "VWAP" });
 
     const ro = new ResizeObserver(() => {
@@ -110,6 +110,11 @@ export default function CandleChart({ candles, fibonacci }) {
   }, []);
 
   // Update candle data — use IST-shifted timestamps
+  useEffect(() => {
+    ["bbUpper","bbMid","bbLower","ema9","ema21","vwap"].forEach(k =>
+      series.current[k]?.applyOptions({ visible: showOverlays }));
+  }, [showOverlays]);
+
   useEffect(() => {
     if (!series.current.candle || !candles?.length) return;
     const ts = c => toISTTimestamp(c.time);
@@ -144,7 +149,7 @@ export default function CandleChart({ candles, fibonacci }) {
     <div style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: "var(--radius2)", overflow: "hidden", boxShadow: "var(--shadow)" }}>
       <div style={{ padding: "10px 14px 0", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>1-min Chart</span>
-        {[["EMA9", "#3F5FE0"], ["EMA21", "#E0A02E"], ["VWAP", "rgba(230,220,200,0.6)"], ["BB", "rgba(139,108,240,0.7)"]].map(([l, c]) => (
+        {[["EMA9", "#2962FF"], ["EMA21", "#D4AF37"], ["VWAP", "rgba(230,220,200,0.6)"], ["BB", "rgba(139,108,240,0.7)"]].map(([l, c]) => (
           <span key={l} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "var(--text2)" }}>
             <span style={{ width: 20, height: 2, background: c, display: "inline-block", borderRadius: 1 }} />{l}
           </span>
